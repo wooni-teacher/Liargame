@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>🔍 라이어 게임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat SDK) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-database-compat.js"></script>
+
+<style>
+:root{
+  --navy-1:#14133B;
+  --navy-2:#1F1E52;
+  --navy-3:#2A2970;
+  --yellow:#FFD23F;
+  --pink:#FF3E7F;
+  --teal:#2EC4B6;
+  --purple:#8B7FE8;
+  --orange:#FF8C42;
+  --text:#F5F3FF;
+  --muted:#ABA6DE;
+  --card:#242263;
+  --ring: 0 0 0 3px rgba(255,255,255,0.08);
+  --radius: 22px;
+  --pop: cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:'Noto Sans KR', sans-serif;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(255,62,127,0.28), transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(255,210,63,0.16), transparent 40%),
+    radial-gradient(circle at 85% 88%, rgba(46,196,182,0.26), transparent 42%),
+    radial-gradient(circle at 10% 90%, rgba(139,127,232,0.22), transparent 42%),
+    var(--navy-1);
+  background-attachment:fixed;
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  position:relative;
+}
+.screen{ position:relative; z-index:1; }
+
+/* ---------- Floating decoration layer ---------- */
+#float-layer{
+  position:fixed; inset:0; overflow:hidden; z-index:0; pointer-events:none;
+}
+#float-layer span{
+  position:absolute; bottom:-60px; font-size:26px; opacity:.16;
+  animation:floatUp linear infinite;
+  filter:drop-shadow(0 0 6px rgba(255,255,255,.15));
+}
+@keyframes floatUp{
+  0%{ transform:translateY(0) rotate(0deg); opacity:0; }
+  10%{ opacity:.18; }
+  90%{ opacity:.14; }
+  100%{ transform:translateY(-110vh) rotate(360deg); opacity:0; }
+}
+@keyframes wiggle{
+  0%,100%{ transform:rotate(-6deg) scale(1); }
+  50%{ transform:rotate(6deg) scale(1.08); }
+}
+@keyframes popIn{
+  0%{ transform:scale(.5) rotate(-8deg); opacity:0; }
+  70%{ transform:scale(1.06) rotate(2deg); opacity:1; }
+  100%{ transform:scale(1) rotate(0deg); }
+}
+@keyframes shimmerSweep{
+  0%{ transform:translateX(-120%) skewX(-15deg); }
+  100%{ transform:translateX(220%) skewX(-15deg); }
+}
+@keyframes pulseGlow{
+  0%,100%{ box-shadow:0 0 0 0 rgba(255,62,127,.5); }
+  50%{ box-shadow:0 0 0 14px rgba(255,62,127,0); }
+}
+@keyframes shake{
+  0%,100%{ transform:translateX(0); }
+  25%{ transform:translateX(-4px); }
+  75%{ transform:translateX(4px); }
+}
+@keyframes confettiFall{
+  0%{ transform:translateY(-20px) rotate(0deg); opacity:1; }
+  100%{ transform:translateY(105vh) rotate(720deg); opacity:0; }
+}
+@keyframes sparkle{
+  0%,100%{ opacity:0; transform:scale(.6) rotate(0deg); }
+  50%{ opacity:1; transform:scale(1.15) rotate(20deg); }
+}
+@keyframes marquee{
+  0%{ background-position:0 0; }
+  100%{ background-position:60px 0; }
+}
+@keyframes gradientMove{
+  0%{ background-position:0% 50%; }
+  100%{ background-position:300% 50%; }
+}
+@keyframes stampPop{
+  0%{ transform:scale(0) rotate(-25deg); opacity:0; }
+  60%{ transform:scale(1.3) rotate(8deg); opacity:1; }
+  100%{ transform:scale(1) rotate(-8deg); opacity:1; }
+}
+h1,h2,h3, .display{ font-family:'Baloo 2', 'Noto Sans KR', sans-serif; }
+button{ font-family:inherit; }
+.screen{ display:none; min-height:100vh; padding:24px 16px 60px; }
+.screen.active{ display:block; animation: fadeUp .35s ease; }
+@keyframes fadeUp{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;} }
+.wrap{ max-width:720px; margin:0 auto; }
+.wrap.wide{ max-width:1100px; }
+
+/* ---------- Home ---------- */
+.home-hero{ text-align:center; padding:40px 0 20px; }
+.home-hero .logo{
+  font-size:64px; display:inline-block; margin-bottom:6px;
+  filter:drop-shadow(0 6px 18px rgba(255,62,127,.5));
+  animation:wiggle 2.4s ease-in-out infinite;
+}
+.home-hero h1{
+  font-size:44px; font-weight:800; margin:0 0 8px; letter-spacing:-.5px;
+  background:linear-gradient(90deg, var(--pink), var(--yellow), var(--teal), var(--purple), var(--pink));
+  background-size:300% auto;
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  animation:gradientMove 5s linear infinite;
+}
+.home-hero p{ color:var(--muted); font-size:16px; margin:0; font-weight:500; }
+
+.role-grid{ display:grid; grid-template-columns:1fr; gap:16px; margin-top:32px; }
+@media(min-width:640px){ .role-grid{ grid-template-columns:1fr 1fr 1fr; } }
+.role-card{
+  position:relative; overflow:hidden;
+  background:linear-gradient(160deg, var(--card), var(--navy-2));
+  border:2px solid rgba(255,255,255,0.08);
+  border-radius:var(--radius);
+  padding:28px 20px;
+  text-align:center;
+  cursor:pointer;
+  transition:transform .2s var(--pop), box-shadow .2s ease, border-color .2s ease;
+}
+.role-card:nth-child(1){ transform:rotate(-1.5deg); }
+.role-card:nth-child(2){ transform:rotate(0deg); }
+.role-card:nth-child(3){ transform:rotate(1.5deg); }
+.role-card::before{
+  content:''; position:absolute; top:0; left:0; width:60%; height:100%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.14), transparent);
+  transform:translateX(-120%) skewX(-15deg); pointer-events:none;
+}
+.role-card:hover{
+  transform:translateY(-8px) rotate(0deg) scale(1.03);
+  box-shadow:0 18px 36px rgba(0,0,0,.4);
+}
+.role-card.admin:hover{ border-color:var(--yellow); }
+.role-card.player:hover{ border-color:var(--pink); }
+.role-card.board:hover{ border-color:var(--teal); }
+.role-card:hover::before{ animation:shimmerSweep .9s ease; }
+.role-card .icon{ width:72px; height:72px; margin:0 auto 12px; display:block; transition:transform .25s var(--pop); }
+.role-card .icon svg{ width:100%; height:100%; display:block; filter:drop-shadow(0 6px 10px rgba(0,0,0,.2)); }
+.role-card:hover .icon{ transform:scale(1.15) rotate(-6deg); }
+.role-card h3{ margin:0 0 6px; font-size:19px; }
+.role-card p{ margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+.role-card.admin .icon{ color:var(--yellow); }
+.role-card.player .icon{ color:var(--pink); }
+.role-card.board .icon{ color:var(--teal); }
+
+/* ---------- Generic layout ---------- */
+.topbar{ display:flex; align-items:center; justify-content:space-between; max-width:720px; margin:0 auto 22px; }
+.wide .topbar{ max-width:1100px; }
+.back-btn{
+  background:none; border:none; color:var(--muted); font-size:14px; cursor:pointer;
+  display:flex; align-items:center; gap:6px; padding:8px 10px; border-radius:10px;
+}
+.back-btn:hover{ background:rgba(255,255,255,.06); color:var(--text); }
+.room-code-pill{
+  background:var(--navy-3); border:1px solid rgba(255,255,255,.1);
+  padding:8px 14px; border-radius:999px; font-weight:700; letter-spacing:2px; font-size:14px;
+}
+
+.panel{
+  background:linear-gradient(160deg, var(--card), var(--navy-2));
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:var(--radius);
+  padding:24px;
+  margin-bottom:18px;
+  box-shadow:0 10px 26px rgba(0,0,0,.22);
+  animation:popIn .4s var(--pop);
+}
+.panel h2{ margin:0 0 4px; font-size:22px; letter-spacing:-.3px; }
+.panel .sub{ color:var(--muted); font-size:13px; margin:0 0 18px; }
+
+label{ display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; font-weight:500; }
+label:first-child{ margin-top:0; }
+input[type=text], input[type=number]{
+  width:100%; padding:13px 14px; border-radius:14px; border:1px solid rgba(255,255,255,.12);
+  background:var(--navy-1); color:var(--text); font-size:15px; outline:none;
+}
+input:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(139,127,232,.25); }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.stepper{ display:flex; align-items:center; gap:10px; }
+.stepper button{
+  width:38px; height:38px; border-radius:12px; border:none; background:var(--navy-3); color:var(--text);
+  font-size:18px; cursor:pointer; font-weight:700;
+}
+.stepper button:hover{ background:var(--purple); }
+.stepper .val{ font-size:18px; font-weight:800; min-width:36px; text-align:center; }
+
+.btn{
+  border:none; border-radius:16px; padding:15px 20px; font-size:15px; font-weight:800;
+  cursor:pointer; width:100%; margin-top:18px;
+  transition:transform .15s var(--pop), filter .12s ease, box-shadow .15s ease;
+  box-shadow:0 6px 0 rgba(0,0,0,.18), 0 10px 20px rgba(0,0,0,.2);
+}
+.btn:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 8px 0 rgba(0,0,0,.18), 0 14px 24px rgba(0,0,0,.25); }
+.btn:active:not(:disabled){ transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.18), 0 4px 10px rgba(0,0,0,.2); }
+.btn-primary{ background:linear-gradient(135deg, var(--pink), #ff6b9d); color:#fff; }
+.btn-primary:hover:not(:disabled){ filter:brightness(1.08); }
+.btn-teal{ background:linear-gradient(135deg, var(--teal), #47e0d1); color:#08302c; }
+.btn-yellow{ background:linear-gradient(135deg, var(--yellow), #ffe27a); color:#4a3800; }
+.btn-ghost{ background:var(--navy-3); color:var(--text); box-shadow:0 6px 0 rgba(0,0,0,.12); }
+.btn:disabled{ opacity:.4; cursor:not-allowed; box-shadow:none; }
+.btn-sm{ width:auto; padding:10px 16px; font-size:13px; margin-top:0; border-radius:12px; box-shadow:0 4px 0 rgba(0,0,0,.15); }
+
+.error-msg{ color:var(--pink); font-size:13px; margin-top:10px; min-height:16px; }
+
+/* ---------- Category grid (admin picks / shows) ---------- */
+.cat-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(90px,1fr)); gap:10px; margin-top:14px; }
+.cat-chip{
+  background:var(--navy-1); border:1px solid rgba(255,255,255,.1); border-radius:14px;
+  padding:12px 6px; text-align:center; font-size:12px; color:var(--muted);
+}
+.cat-chip .em{ font-size:24px; display:block; margin-bottom:4px; }
+.cat-chip.active{ border-color:var(--yellow); background:rgba(255,210,63,.12); color:var(--text); }
+
+/* ---------- Player list ---------- */
+.player-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.player-list li{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--navy-1); border-radius:14px; padding:12px 16px; font-size:14px; border:1px solid rgba(255,255,255,.06);
+}
+.player-list .pname{ display:flex; align-items:center; gap:10px; font-weight:600; }
+.avatar{ width:30px; height:30px; border-radius:50%; background:var(--purple); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#fff; }
+.score-badge{ background:var(--navy-3); padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; color:var(--yellow); }
+
+/* ---------- Word reveal card ---------- */
+.reveal-wrap{ text-align:center; padding:10px 0 6px; }
+.topic-icon-box{ width:100px; height:100px; margin:0 auto; animation:popIn .5s var(--pop); }
+.topic-icon-box svg{ width:100%; height:100%; filter:drop-shadow(0 6px 12px rgba(0,0,0,.25)); }
+.flip-card{
+  width:220px; height:280px; margin:20px auto; perspective:1000px; cursor:pointer;
+}
+.flip-inner{ position:relative; width:100%; height:100%; transition:transform .6s; transform-style:preserve-3d; }
+.flip-card.flipped .flip-inner{ transform:rotateY(180deg); }
+.flip-face{
+  position:absolute; inset:0; backface-visibility:hidden; border-radius:20px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  box-shadow:0 20px 40px rgba(0,0,0,.4);
+}
+.flip-front{ background:linear-gradient(160deg,var(--navy-3),var(--card)); border:2px dashed rgba(255,255,255,.3); }
+.flip-front .q{ font-size:56px; animation:wiggle 1.8s ease-in-out infinite; }
+.flip-front span{ color:var(--muted); font-size:13px; }
+.flip-back{ transform:rotateY(180deg); background:linear-gradient(160deg,var(--yellow),#ffb443); color:#3d2c00; position:relative; overflow:hidden; }
+.flip-back.liar{ background:linear-gradient(160deg, var(--pink), #b8265b); color:#fff; }
+.flip-back::after{
+  content:'✨'; position:absolute; top:14px; right:18px; font-size:22px;
+  animation:sparkle 1.6s ease-in-out infinite;
+}
+.flip-back::before{
+  content:'✨'; position:absolute; bottom:16px; left:16px; font-size:16px;
+  animation:sparkle 1.6s ease-in-out infinite .5s;
+}
+.flip-back .em{ width:90px; height:90px; animation:popIn .5s var(--pop) .3s backwards; }
+.flip-back .em svg{ width:100%; height:100%; filter:drop-shadow(0 4px 8px rgba(0,0,0,.25)); }
+.flip-back .word{ font-size:25px; font-weight:800; }
+.flip-back .cat{ font-size:13px; opacity:.9; font-weight:600; }
+.flip-card{ transition:transform .15s ease; }
+.flip-card:hover{ transform:scale(1.03) rotate(-1deg); }
+
+/* ---------- Turn / speaking ---------- */
+.turn-banner{
+  background:linear-gradient(135deg, var(--purple), #6a5fd0); border-radius:20px; padding:22px;
+  text-align:center; margin-bottom:16px; position:relative; overflow:hidden;
+  box-shadow:0 10px 24px rgba(139,127,232,.35);
+}
+.turn-banner .who{ font-size:26px; font-weight:800; margin:4px 0; }
+.turn-banner .timer{ font-size:44px; font-weight:800; font-family:'Baloo 2'; transition:color .2s ease; }
+.turn-banner .timer.urgent{ color:var(--yellow); animation:shake .35s ease infinite; }
+.turn-order-strip{ display:flex; gap:8px; overflow-x:auto; padding:6px 2px 14px; }
+.turn-chip{
+  flex:0 0 auto; background:var(--navy-1); border:2px solid transparent; border-radius:14px;
+  padding:8px 14px; font-size:13px; font-weight:700; color:var(--muted); white-space:nowrap;
+  transition:transform .15s var(--pop);
+}
+.turn-chip.current{ border-color:var(--yellow); color:var(--text); background:rgba(255,210,63,.16); transform:scale(1.08); animation:pulseGlow 1.6s ease-in-out infinite; }
+.turn-chip.done{ opacity:.4; text-decoration:line-through; }
+
+.chat-box{
+  background:var(--navy-1); border-radius:18px; padding:14px; height:320px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:10px; border:1px solid rgba(255,255,255,.06);
+}
+.chat-msg{ max-width:80%; padding:10px 14px; border-radius:16px; font-size:14px; line-height:1.4; align-self:flex-start; background:var(--navy-3); animation:popIn .3s var(--pop); }
+.chat-msg .who{ font-size:11px; color:var(--muted); margin-bottom:3px; font-weight:700; }
+.chat-msg.me{ align-self:flex-end; background:linear-gradient(135deg,var(--pink),#ff6b9d); color:#fff; }
+.chat-msg.me .who{ color:rgba(255,255,255,.75); }
+.chat-input-row{ display:flex; gap:8px; margin-top:10px; }
+.chat-input-row input{ flex:1; }
+.chat-input-row button{ width:auto; padding:0 20px; margin-top:0; border-radius:14px; }
+
+/* ---------- Vote ---------- */
+.vote-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:12px; margin-top:12px; }
+.vote-card{
+  position:relative;
+  background:var(--navy-1); border:2px solid rgba(255,255,255,.1); border-radius:16px;
+  padding:16px 8px; text-align:center; cursor:pointer; user-select:none;
+  transition:transform .15s var(--pop), border-color .15s ease;
+}
+.vote-card:hover{ transform:translateY(-3px); }
+.vote-card .av{ width:44px; height:44px; border-radius:50%; background:var(--purple); margin:0 auto 8px; display:flex; align-items:center; justify-content:center; font-weight:800; transition:transform .15s var(--pop); }
+.vote-card .nm{ font-size:13px; font-weight:700; }
+.vote-card.selected{ border-color:var(--yellow); background:rgba(255,210,63,.14); transform:scale(1.04); }
+.vote-card.selected .av{ background:var(--yellow); color:#3d2c00; }
+.vote-card.selected::after{
+  content:'🔍'; position:absolute; top:-10px; right:-6px; font-size:22px;
+  animation:stampPop .3s var(--pop);
+}
+.vote-hint{ text-align:center; color:var(--muted); font-size:13px; margin-top:14px; }
+
+/* ---------- Results ---------- */
+.result-row{
+  display:flex; align-items:center; justify-content:space-between; background:var(--navy-1);
+  border-radius:14px; padding:12px 16px; margin-bottom:8px; border:1px solid rgba(255,255,255,.06);
+}
+.result-row.liar{ border-color:rgba(255,62,127,.5); background:rgba(255,62,127,.08); }
+.result-row .tag{ font-size:11px; padding:3px 8px; border-radius:8px; background:var(--navy-3); margin-left:8px; }
+.result-row .tag.liar-tag{ background:var(--pink); color:#fff; }
+.result-row .delta{ font-weight:800; font-family:'Baloo 2'; font-size:16px; }
+.delta.pos{ color:var(--teal); }
+.delta.neg{ color:var(--pink); }
+.delta.zero{ color:var(--muted); }
+
+/* ---------- Board (전자칠판) ---------- */
+#screen-board{ padding:0; }
+.board-wrap{ min-height:100vh; display:flex; flex-direction:column; padding:28px 40px; position:relative; }
+.board-wrap::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:6px;
+  background:repeating-linear-gradient(90deg, var(--pink) 0 20px, var(--yellow) 20px 40px, var(--teal) 40px 60px, var(--purple) 60px 80px);
+  background-size:80px 6px; animation:marquee 3s linear infinite;
+}
+.board-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; padding-top:10px; }
+.board-header .title{
+  font-size:32px; font-weight:800; display:flex; align-items:center; gap:12px;
+  background:linear-gradient(90deg, var(--pink), var(--yellow), var(--teal), var(--purple), var(--pink));
+  background-size:300% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  animation:gradientMove 6s linear infinite;
+}
+.board-header .code{ font-size:20px; background:var(--navy-3); padding:10px 22px; border-radius:999px; letter-spacing:4px; font-weight:800; box-shadow:0 4px 0 rgba(0,0,0,.2); }
+.board-main{ flex:1; display:grid; grid-template-columns: 1.1fr 1.6fr; gap:26px; }
+@media(max-width:900px){ .board-main{ grid-template-columns:1fr; } }
+.board-left{ display:flex; flex-direction:column; gap:18px; }
+.board-topic-card{
+  background:linear-gradient(160deg, var(--card), var(--navy-2)); border-radius:26px; padding:34px;
+  text-align:center; border:2px solid rgba(255,255,255,.1); box-shadow:0 14px 30px rgba(0,0,0,.3);
+  animation:popIn .5s var(--pop);
+}
+.board-topic-card .em{ width:120px; height:120px; margin:0 auto; display:block; animation:wiggle 3s ease-in-out infinite; }
+.board-topic-card .em svg{ width:100%; height:100%; filter:drop-shadow(0 8px 16px rgba(0,0,0,.3)); }
+.board-topic-card .cat{ font-size:30px; font-weight:800; margin-top:8px; }
+.board-timer{ font-size:76px; font-weight:800; font-family:'Baloo 2'; text-align:center; color:var(--yellow); text-shadow:0 4px 0 rgba(0,0,0,.25); transition:color .2s ease; }
+.board-timer.urgent{ color:var(--pink); animation:shake .3s ease infinite; }
+.board-order{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+.board-order .turn-chip{ font-size:16px; padding:11px 20px; font-weight:800; }
+.board-speaker{
+  text-align:center; background:linear-gradient(135deg, var(--purple), #6a5fd0); border-radius:20px; padding:20px;
+  font-size:28px; font-weight:800; box-shadow:0 10px 22px rgba(139,127,232,.35); animation:popIn .35s var(--pop);
+}
+.board-chat{
+  background:var(--navy-1); border-radius:26px; padding:24px; flex:1; overflow-y:auto; border:2px solid rgba(255,255,255,.08);
+  display:flex; flex-direction:column; gap:14px; min-height:400px;
+}
+.board-chat .chat-msg{ font-size:23px; max-width:90%; padding:18px 24px; box-shadow:0 4px 10px rgba(0,0,0,.15); }
+.board-chat .chat-msg .who{ font-size:15px; }
+.board-status{ text-align:center; font-size:24px; color:var(--muted); margin-top:60px; }
+
+/* misc */
+.hidden{ display:none !important; }
+.center-note{ text-align:center; color:var(--muted); font-size:13px; margin-top:12px; }
+.divider{ height:1px; background:rgba(255,255,255,.08); margin:18px 0; }
+.badge-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.badge{ background:var(--navy-3); padding:6px 12px; border-radius:999px; font-size:12px; color:var(--muted); }
+.footer-note{ text-align:center; color:var(--muted); font-size:12px; margin-top:30px; opacity:.7; }
+.setup-warning{
+  background:rgba(255,210,63,.1); border:1px solid rgba(255,210,63,.35); color:var(--yellow);
+  padding:14px 16px; border-radius:14px; font-size:13px; margin-bottom:20px; line-height:1.6;
+}
+</style>
+</head>
+<body>
+
+<div id="float-layer"></div>
+<div id="confetti-layer" style="position:fixed; inset:0; overflow:hidden; z-index:999; pointer-events:none;"></div>
+
+<!-- ============ HOME ============ -->
+<div id="screen-home" class="screen active">
+  <div class="wrap">
+    <div class="home-hero">
+      <span class="logo">🔍</span>
+      <h1>라이어 게임</h1>
+      <p>우리 반 탐정 대결! 라이어를 찾아라</p>
+    </div>
+    <div id="config-warning"></div>
+    <div class="role-grid">
+      <div class="role-card admin" onclick="goTo('adminSetup')">
+        <div class="icon" id="icon-role-admin"></div>
+        <h3>관리자로 시작</h3>
+        <p>방을 만들고 게임을 진행해요</p>
+      </div>
+      <div class="role-card player" onclick="goTo('joinForm')">
+        <div class="icon" id="icon-role-player"></div>
+        <h3>참가자로 참여</h3>
+        <p>참여 코드로 게임에 들어가요</p>
+      </div>
+      <div class="role-card board" onclick="goTo('boardJoin')">
+        <div class="icon" id="icon-role-board"></div>
+        <h3>전자칠판 화면</h3>
+        <p>교실 화면에 크게 띄워요</p>
+      </div>
+    </div>
+    <p class="footer-note">Firebase Realtime Database 기반 · 학교 수업용</p>
+  </div>
+</div>
+
+<!-- ============ ADMIN SETUP ============ -->
+<div id="screen-adminSetup" class="screen">
+  <div class="wrap">
+    <div class="topbar">
+      <button class="back-btn" onclick="goTo('home')">← 처음으로</button>
+    </div>
+    <div class="panel">
+      <h2>🧑‍🏫 방 만들기</h2>
+      <p class="sub">인원, 시간, 라이어 수를 정해주세요</p>
+
+      <label>최대 인원 수</label>
+      <div class="stepper">
+        <button onclick="stepVal('maxPlayers',-1,3,12)">−</button>
+        <div class="val" id="val-maxPlayers">6</div>
+        <button onclick="stepVal('maxPlayers',1,3,12)">+</button>
+        <span class="center-note" style="margin:0 0 0 8px;">명</span>
+      </div>
+
+      <label>한 사람당 발언 시간</label>
+      <div class="stepper">
+        <button onclick="stepVal('turnTime',-5,10,120)">−</button>
+        <div class="val" id="val-turnTime">30</div>
+        <button onclick="stepVal('turnTime',5,10,120)">+</button>
+        <span class="center-note" style="margin:0 0 0 8px;">초</span>
+      </div>
+
+      <label>라이어 인원 수</label>
+      <div class="stepper">
+        <button onclick="stepVal('liarCount',-1,1,2)">−</button>
+        <div class="val" id="val-liarCount">1</div>
+        <button onclick="stepVal('liarCount',1,1,2)">+</button>
+        <span class="center-note" style="margin:0 0 0 8px;">명</span>
+      </div>
+
+      <button class="btn btn-primary" onclick="createRoom()">방 만들기</button>
+      <div class="error-msg" id="adminSetupError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ADMIN ROOM (lobby + control) ============ -->
+<div id="screen-adminRoom" class="screen">
+  <div class="wrap wide">
+    <div class="topbar">
+      <button class="back-btn" onclick="leaveRoom()">← 나가기</button>
+      <div class="room-code-pill">참여코드 <span id="admin-roomcode">----</span></div>
+    </div>
+
+    <!-- Lobby -->
+    <div class="panel" id="admin-lobby-panel">
+      <h2>👥 대기실</h2>
+      <p class="sub">학생들에게 참여코드를 알려주세요. 설정: <span id="admin-settings-summary"></span></p>
+      <ul class="player-list" id="admin-player-list"></ul>
+      <button class="btn btn-yellow" id="admin-start-btn" onclick="startTopicDraw()">🎲 주제 뽑기 시작</button>
+      <div class="error-msg" id="admin-lobby-error"></div>
+    </div>
+
+    <!-- Topic drawn -->
+    <div class="panel hidden" id="admin-topic-panel">
+      <h2>🎲 주제가 뽑혔어요!</h2>
+      <div class="reveal-wrap">
+        <div class="topic-icon-box" id="admin-topic-em"></div>
+        <div style="font-size:22px; font-weight:800;" id="admin-topic-name"></div>
+      </div>
+      <button class="btn btn-primary" onclick="assignRoles()">🃏 제시어 & 라이어 뽑기</button>
+    </div>
+
+    <!-- Assigned -> waiting for reveal -->
+    <div class="panel hidden" id="admin-assigned-panel">
+      <h2>🃏 역할이 배정되었습니다</h2>
+      <p class="sub">학생들이 각자 화면에서 카드를 눌러 제시어/역할을 확인해요.</p>
+      <ul class="player-list" id="admin-reveal-status"></ul>
+      <button class="btn btn-teal" onclick="startPlaying()">▶️ 게임 시작 (순서대로 말하기)</button>
+    </div>
+
+    <!-- Playing -->
+    <div class="panel hidden" id="admin-playing-panel">
+      <h2>🎤 발언 진행중</h2>
+      <div class="turn-banner">
+        <div class="center-note" style="color:rgba(255,255,255,.75)">지금 말할 사람</div>
+        <div class="who" id="admin-current-speaker">-</div>
+        <div class="timer" id="admin-timer">--</div>
+      </div>
+      <div class="turn-order-strip" id="admin-turn-strip"></div>
+      <div class="chat-box" id="admin-chat-box"></div>
+      <div class="row2" style="margin-top:14px;">
+        <button class="btn btn-ghost" onclick="prevTurn()">⏮ 이전 순서</button>
+        <button class="btn btn-yellow" onclick="nextTurn()">다음 순서 ⏭</button>
+      </div>
+      <button class="btn btn-primary" id="admin-to-vote-btn" onclick="startVoting()" disabled>🗳️ 투표 시작하기</button>
+    </div>
+
+    <!-- Voting -->
+    <div class="panel hidden" id="admin-voting-panel">
+      <h2>🗳️ 라이어 지목 투표중</h2>
+      <p class="sub">각자 라이어라고 생각하는 사람을 <span id="admin-liarcount-label"></span>명 선택해요</p>
+      <ul class="player-list" id="admin-vote-status"></ul>
+      <button class="btn btn-primary" onclick="revealResults()">📢 결과 발표하기</button>
+    </div>
+
+    <!-- Results -->
+    <div class="panel hidden" id="admin-results-panel">
+      <h2>📢 결과 발표</h2>
+      <div id="admin-results-list"></div>
+      <div class="row2" style="margin-top:18px;">
+        <button class="btn btn-ghost" onclick="resetScoresConfirm()">점수 초기화</button>
+        <button class="btn btn-yellow" onclick="startTopicDraw()">🔁 다음 라운드</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 style="font-size:16px;">👥 참가자 (<span id="admin-score-count">0</span>명)</h2>
+      <ul class="player-list" id="admin-score-list"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============ JOIN FORM ============ -->
+<div id="screen-joinForm" class="screen">
+  <div class="wrap">
+    <div class="topbar">
+      <button class="back-btn" onclick="goTo('home')">← 처음으로</button>
+    </div>
+    <div class="panel">
+      <h2>🙋 게임 참여하기</h2>
+      <p class="sub">선생님이 알려준 참여코드와 이름을 입력하세요</p>
+      <label>참여코드</label>
+      <input type="text" id="join-code" placeholder="예: 4821" maxlength="4" inputmode="numeric">
+      <label>이름 (또는 별명)</label>
+      <input type="text" id="join-name" placeholder="예: 홍길동" maxlength="10">
+      <button class="btn btn-primary" onclick="joinRoom()">참여하기</button>
+      <div class="error-msg" id="joinError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLAYER ROOM ============ -->
+<div id="screen-playerRoom" class="screen">
+  <div class="wrap">
+    <div class="topbar">
+      <button class="back-btn" onclick="leaveRoom()">← 나가기</button>
+      <div class="room-code-pill" id="player-roomcode-pill">----</div>
+    </div>
+
+    <!-- waiting -->
+    <div class="panel" id="player-waiting-panel">
+      <h2>⏳ 대기중</h2>
+      <p class="sub">선생님이 게임을 시작할 때까지 기다려주세요</p>
+      <ul class="player-list" id="player-waiting-list"></ul>
+    </div>
+
+    <!-- topic shown -->
+    <div class="panel hidden" id="player-topic-panel">
+      <h2>🎲 주제가 뽑혔어요!</h2>
+      <div class="reveal-wrap">
+        <div class="topic-icon-box" id="player-topic-em"></div>
+        <div style="font-size:22px; font-weight:800;" id="player-topic-name"></div>
+      </div>
+      <p class="center-note">곧 각자의 제시어가 배정됩니다</p>
+    </div>
+
+    <!-- reveal card -->
+    <div class="panel hidden" id="player-reveal-panel">
+      <h2 style="text-align:center;">🃏 내 카드를 확인해보세요</h2>
+      <div class="flip-card" id="player-flip-card" onclick="flipCard()">
+        <div class="flip-inner">
+          <div class="flip-face flip-front">
+            <div class="q">❓</div>
+            <span>탭해서 확인하기</span>
+          </div>
+          <div class="flip-face flip-back" id="player-flip-back">
+            <div class="em" id="player-word-em"></div>
+            <div class="word" id="player-word-text"></div>
+            <div class="cat" id="player-word-cat"></div>
+          </div>
+        </div>
+      </div>
+      <p class="center-note">다른 친구에게 보여주지 마세요! 🤫</p>
+    </div>
+
+    <!-- playing -->
+    <div class="panel hidden" id="player-playing-panel">
+      <div class="turn-banner">
+        <div class="center-note" style="color:rgba(255,255,255,.75)" id="player-turn-label">지금 말할 사람</div>
+        <div class="who" id="player-current-speaker">-</div>
+        <div class="timer" id="player-timer">--</div>
+      </div>
+      <div class="chat-box" id="player-chat-box"></div>
+      <div class="chat-input-row">
+        <input type="text" id="player-chat-input" placeholder="차례가 되면 입력할 수 있어요" disabled maxlength="80">
+        <button class="btn btn-teal" id="player-chat-send" onclick="sendChat()" disabled>보내기</button>
+      </div>
+    </div>
+
+    <!-- voting -->
+    <div class="panel hidden" id="player-voting-panel">
+      <h2>🗳️ 라이어는 누구?!</h2>
+      <p class="sub">라이어라고 생각하는 사람을 <span id="player-liarcount-label"></span>명 선택하세요</p>
+      <div class="vote-grid" id="player-vote-grid"></div>
+      <button class="btn btn-primary" id="player-vote-submit" onclick="submitVote()" disabled>투표 제출하기</button>
+      <div class="vote-hint" id="player-vote-hint"></div>
+    </div>
+
+    <!-- results -->
+    <div class="panel hidden" id="player-results-panel">
+      <h2>📢 결과 발표</h2>
+      <div id="player-results-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BOARD JOIN ============ -->
+<div id="screen-boardJoin" class="screen">
+  <div class="wrap">
+    <div class="topbar">
+      <button class="back-btn" onclick="goTo('home')">← 처음으로</button>
+    </div>
+    <div class="panel">
+      <h2>🖥️ 전자칠판 화면</h2>
+      <p class="sub">참여코드를 입력하면 큰 화면으로 게임을 보여줘요</p>
+      <label>참여코드</label>
+      <input type="text" id="board-code" placeholder="예: 4821" maxlength="4" inputmode="numeric">
+      <button class="btn btn-teal" onclick="joinBoard()">화면 띄우기</button>
+      <div class="error-msg" id="boardJoinError"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BOARD DISPLAY ============ -->
+<div id="screen-board" class="screen">
+  <div class="board-wrap">
+    <div class="board-header">
+      <div class="title">🔍 라이어 게임</div>
+      <div class="code" id="board-roomcode">----</div>
+    </div>
+    <div id="board-status-view" class="board-status">대기중입니다...</div>
+    <div class="board-main hidden" id="board-main-view">
+      <div class="board-left">
+        <div class="board-topic-card">
+          <div class="em" id="board-topic-em"></div>
+          <div class="cat" id="board-topic-name">주제 대기중</div>
+        </div>
+        <div class="board-timer hidden" id="board-timer">--</div>
+        <div class="board-speaker hidden" id="board-speaker"></div>
+        <div class="board-order" id="board-order"></div>
+      </div>
+      <div class="board-chat" id="board-chat"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   ⚠️ FIREBASE 설정 — 아래 값을 본인의 Firebase 프로젝트 값으로 바꿔주세요.
+   Firebase 콘솔 > 프로젝트 설정 > 일반 > 내 앱 > SDK 설정 및 구성 에서 복사
+   Realtime Database를 사용하며, 테스트 규칙(읽기/쓰기 모두 허용)으로
+   시작하는 것을 권장합니다 (교실 내부용, 소규모 사용 기준).
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyBBsCiwJ11hV9uPYktcWB_Jbci4O1MxnZw",
+  authDomain: "liargame-33dff.firebaseapp.com",
+  databaseURL: "https://liargame-33dff-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "liargame-33dff",
+  storageBucket: "liargame-33dff.firebasestorage.app",
+  messagingSenderId: "121467473102",
+  appId: "1:121467473102:web:00f3fd1c2f27fd9336949f"
+};
+
+let db = null;
+let firebaseReady = false;
+try{
+  if(firebaseConfig.apiKey !== "YOUR_API_KEY"){
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    firebaseReady = true;
+  }
+}catch(e){ console.error(e); }
+
+/* =========================================================
+   카테고리 & 제시어 (초등학생 눈높이)
+   ========================================================= */
+const CATEGORIES = {
+  "과일": [
+    {w:"사과",e:"🍎"},{w:"바나나",e:"🍌"},{w:"딸기",e:"🍓"},{w:"포도",e:"🍇"},
+    {w:"수박",e:"🍉"},{w:"오렌지",e:"🍊"},{w:"복숭아",e:"🍑"},{w:"키위",e:"🥝"}
+  ],
+  "동물": [
+    {w:"강아지",e:"🐶"},{w:"고양이",e:"🐱"},{w:"코끼리",e:"🐘"},{w:"사자",e:"🦁"},
+    {w:"토끼",e:"🐰"},{w:"호랑이",e:"🐯"},{w:"판다",e:"🐼"},{w:"기린",e:"🦒"}
+  ],
+  "학용품": [
+    {w:"연필",e:"✏️"},{w:"지우개",e:"🧼"},{w:"가위",e:"✂️"},{w:"풀",e:"🧴"},
+    {w:"색연필",e:"🖍️"},{w:"필통",e:"📐"},{w:"자",e:"📏"},{w:"공책",e:"📓"}
+  ],
+  "음식": [
+    {w:"김밥",e:"🍙"},{w:"라면",e:"🍜"},{w:"피자",e:"🍕"},{w:"치킨",e:"🍗"},
+    {w:"떡볶이",e:"🌶️"},{w:"짜장면",e:"🍝"},{w:"햄버거",e:"🍔"},{w:"초밥",e:"🍣"}
+  ],
+  "직업": [
+    {w:"의사",e:"🩺"},{w:"선생님",e:"🍎"},{w:"경찰관",e:"👮"},{w:"소방관",e:"🚒"},
+    {w:"요리사",e:"👨‍🍳"},{w:"가수",e:"🎤"},{w:"화가",e:"🎨"},{w:"운동선수",e:"🏅"}
+  ],
+  "운동": [
+    {w:"축구",e:"⚽"},{w:"야구",e:"⚾"},{w:"농구",e:"🏀"},{w:"수영",e:"🏊"},
+    {w:"줄넘기",e:"🪢"},{w:"태권도",e:"🥋"},{w:"배드민턴",e:"🏸"},{w:"달리기",e:"🏃"}
+  ],
+  "탈것": [
+    {w:"자동차",e:"🚗"},{w:"버스",e:"🚌"},{w:"기차",e:"🚆"},{w:"비행기",e:"✈️"},
+    {w:"배",e:"🚢"},{w:"자전거",e:"🚲"},{w:"오토바이",e:"🏍️"},{w:"지하철",e:"🚇"}
+  ],
+  "장난감": [
+    {w:"로봇",e:"🤖"},{w:"인형",e:"🧸"},{w:"블록",e:"🧱"},{w:"공",e:"⚽"},
+    {w:"팽이",e:"🌀"},{w:"딱지",e:"🀄"},{w:"풍선",e:"🎈"},{w:"퍼즐",e:"🧩"}
+  ],
+  "계절과날씨": [
+    {w:"봄",e:"🌸"},{w:"여름",e:"☀️"},{w:"가을",e:"🍂"},{w:"겨울",e:"⛄"},
+    {w:"비",e:"🌧️"},{w:"눈",e:"❄️"},{w:"무지개",e:"🌈"},{w:"태풍",e:"🌪️"}
+  ],
+  "색깔": [
+    {w:"빨강",e:"🔴"},{w:"노랑",e:"🟡"},{w:"파랑",e:"🔵"},{w:"초록",e:"🟢"},
+    {w:"보라",e:"🟣"},{w:"주황",e:"🟠"},{w:"검정",e:"⚫"},{w:"하양",e:"⚪"}
+  ]
+};
+const CATEGORY_ICON = {
+  "과일":"🍎","동물":"🐶","학용품":"✏️","음식":"🍕","직업":"🩺",
+  "운동":"⚽","탈것":"🚗","장난감":"🧸","계절과날씨":"🌈","색깔":"🎨"
+};
+
+/* 손그림 느낌의 SVG 아이콘 세트 (93+1종) */
+const ICON_SVG = {"role-admin": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"38\" r=\"17\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"43\" cy=\"38\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"57\" cy=\"38\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 45 Q 50 50 56 45\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39\" cy=\"44\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><ellipse cx=\"61\" cy=\"44\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><path d=\"M 33 38 Q 33 24 50 24 Q 67 24 67 38 L 67 33 Q 50 20 33 33 Z\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"30\" y=\"58\" width=\"40\" height=\"26\" rx=\"8\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"38\" y=\"50\" width=\"24\" height=\"10\" rx=\"4\" fill=\"#6a5fd0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"44\" y=\"66\" width=\"12\" height=\"14\" rx=\"3\" fill=\"#FFD23F\"/></svg>", "role-player": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"36\" r=\"16\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"43.5\" cy=\"36\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56.5\" cy=\"36\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 43 Q 50 48 56 43\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39.5\" cy=\"42\" rx=\"4\" ry=\"2.6\" fill=\"#ffdcb0\" opacity=\"0.8\"/><ellipse cx=\"60.5\" cy=\"42\" rx=\"4\" ry=\"2.6\" fill=\"#ffdcb0\" opacity=\"0.8\"/><path d=\"M 36 36 Q 36 22 50 22 Q 64 22 64 36 L 64 30 Q 50 18 36 30 Z\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"28\" y=\"58\" width=\"44\" height=\"26\" rx=\"10\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"58\" r=\"7\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 20 78 Q 50 92 80 78 L 80 86 Q 50 98 20 86 Z\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "role-board": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"16\" y=\"26\" width=\"68\" height=\"42\" rx=\"6\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"21\" y=\"31\" width=\"58\" height=\"32\" rx=\"3\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 33 40 L 45 52 L 53 46 L 67 60\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"33\" cy=\"40\" r=\"3.4\" fill=\"#FFD23F\"/><circle cx=\"45\" cy=\"52\" r=\"3.4\" fill=\"#FFD23F\"/><circle cx=\"53\" cy=\"46\" r=\"3.4\" fill=\"#FFD23F\"/><circle cx=\"67\" cy=\"60\" r=\"3.4\" fill=\"#FFD23F\"/><rect x=\"44\" y=\"68\" width=\"12\" height=\"10\" rx=\"2\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"30\" y=\"78\" width=\"40\" height=\"7\" rx=\"3\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "cat-과일": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"42\" cy=\"52\" r=\"20\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"66\" cy=\"44\" r=\"13\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 40 32 Q 44 24 52 26\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"48\" cy=\"26\" rx=\"6\" ry=\"3\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-30 48 26)\"/></svg>", "cat-동물": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"56\" r=\"22\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"30\" cy=\"34\" r=\"11\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"70\" cy=\"34\" r=\"11\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"42\" cy=\"54\" r=\"3\" fill=\"#2B2A5E\"/><circle cx=\"58\" cy=\"54\" r=\"3\" fill=\"#2B2A5E\"/><path d=\"M 44 61 Q 50 66 56 61\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"38\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"62\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"50\" cy=\"66\" rx=\"6\" ry=\"4\" fill=\"#fff\"/></svg>", "cat-학용품": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"44\" y=\"20\" width=\"12\" height=\"50\" rx=\"3\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(8 50.0 45.0)\"/><polygon points=\"40,66 56,66 48,80\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><rect x=\"30\" y=\"72\" width=\"44\" height=\"10\" rx=\"3\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-3 52.0 77.0)\"/></svg>", "cat-음식": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 20 58 A 30 30 0 0 1 80 58 Z\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"18\" y=\"58\" width=\"64\" height=\"7\" rx=\"3\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"38\" cy=\"48\" r=\"3\" fill=\"#FF3E7F\"/><circle cx=\"55\" cy=\"44\" r=\"3\" fill=\"#2EC4B6\"/><circle cx=\"68\" cy=\"52\" r=\"3\" fill=\"#FFD23F\"/></svg>", "cat-직업": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"30\" y=\"46\" width=\"40\" height=\"34\" rx=\"6\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"32\" r=\"14\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44.5\" cy=\"32\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"55.5\" cy=\"32\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 39 Q 50 44 56 39\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40.5\" cy=\"38\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"59.5\" cy=\"38\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"40\" y=\"46\" width=\"20\" height=\"10\" rx=\"3\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "cat-운동": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"50\" r=\"26\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 50 24 L 50 76 M 24 50 L 76 50\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 34 34 Q 50 44 66 34 M 34 66 Q 50 56 66 66\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "cat-탈것": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"20\" y=\"42\" width=\"60\" height=\"22\" rx=\"10\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"30\" y=\"28\" width=\"32\" height=\"18\" rx=\"6\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"34\" cy=\"66\" r=\"8\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"34\" cy=\"66\" r=\"3\" fill=\"#fff\"/><circle cx=\"66\" cy=\"66\" r=\"8\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"66\" cy=\"66\" r=\"3\" fill=\"#fff\"/><rect x=\"36\" y=\"32\" width=\"10\" height=\"12\" rx=\"2\" fill=\"#D6F7F1\"/></svg>", "cat-장난감": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"30\" y=\"30\" width=\"40\" height=\"40\" rx=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"50\" r=\"10\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"30\" cy=\"30\" r=\"7\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"70\" cy=\"30\" r=\"7\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"30\" cy=\"70\" r=\"7\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"70\" cy=\"70\" r=\"7\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "cat-계절과날씨": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"40\" cy=\"40\" r=\"15\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 55 55 Q 60 42 72 46 Q 82 40 84 50 Q 92 52 88 62 Q 90 70 80 70 L 58 70 Q 50 70 52 62 Q 50 56 55 55 Z\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "cat-색깔": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"38\" cy=\"38\" r=\"13\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"64\" cy=\"38\" r=\"13\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"38\" cy=\"64\" r=\"13\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"64\" cy=\"64\" r=\"13\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-사과": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"48\" cy=\"56\" r=\"24\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 46 32 Q 42 22 52 20\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"56\" cy=\"24\" rx=\"7\" ry=\"4\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-25 56 24)\"/><ellipse cx=\"38\" cy=\"48\" rx=\"6\" ry=\"9\" fill=\"#fff\" transform=\"rotate(-20 38 48)\"/></svg>", "word-바나나": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 30 70 Q 26 40 46 26 Q 62 16 74 26 Q 62 24 50 34 Q 34 46 38 70 Z\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"70\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#8a6d00\" transform=\"rotate(30 70 26)\"/></svg>", "word-딸기": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 50 26 Q 74 34 68 58 Q 62 82 50 82 Q 38 82 32 58 Q 26 34 50 26 Z\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 40 26 Q 50 14 60 26 Q 50 22 40 26 Z\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"42\" cy=\"46\" r=\"2\" fill=\"#FFD23F\"/><circle cx=\"56\" cy=\"44\" r=\"2\" fill=\"#FFD23F\"/><circle cx=\"48\" cy=\"58\" r=\"2\" fill=\"#FFD23F\"/><circle cx=\"60\" cy=\"60\" r=\"2\" fill=\"#FFD23F\"/><circle cx=\"40\" cy=\"66\" r=\"2\" fill=\"#FFD23F\"/></svg>", "word-포도": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"38\" cy=\"44\" r=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"52\" cy=\"44\" r=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"45\" cy=\"58\" r=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"59\" cy=\"58\" r=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"52\" cy=\"72\" r=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 44 34 Q 46 24 56 24\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"58\" cy=\"24\" rx=\"6\" ry=\"3.5\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-20 58 24)\"/></svg>", "word-수박": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 20 50 A 30 30 0 0 0 80 50 Z\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 26 50 A 24 24 0 0 0 74 50 Z\" fill=\"#fff\"/><path d=\"M 30 50 A 20 20 0 0 0 70 50 Z\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"44\" cy=\"44\" r=\"2.2\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"44\" r=\"2.2\" fill=\"#2B2A5E\"/><circle cx=\"50\" cy=\"52\" r=\"2.2\" fill=\"#2B2A5E\"/></svg>", "word-오렌지": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"24\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"30\" r=\"2.4\" fill=\"#2EC4B6\"/><path d=\"M 50 34 L 50 74 M 30 54 L 70 54\" stroke=\"#e2761e\" stroke-width=\"1.6\" opacity=\"0.5\" fill=\"none\"/></svg>", "word-복숭아": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 50 30 Q 30 30 28 52 Q 26 76 50 78 Q 74 76 72 52 Q 70 30 50 30 Z\" fill=\"#FFB3C6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 50 30 Q 50 40 50 48\" fill=\"#e28aa5\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"58\" cy=\"22\" rx=\"6\" ry=\"3\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(20 58 22)\"/></svg>", "word-키위": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"24\" fill=\"#8a6d00\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"54\" r=\"20\" fill=\"#D9E86B\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"54\" r=\"6\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"48\" r=\"1.6\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"52\" r=\"1.6\" fill=\"#2B2A5E\"/><circle cx=\"54\" cy=\"58\" r=\"1.6\" fill=\"#2B2A5E\"/><circle cx=\"46\" cy=\"58\" r=\"1.6\" fill=\"#2B2A5E\"/><circle cx=\"44\" cy=\"52\" r=\"1.6\" fill=\"#2B2A5E\"/><circle cx=\"50\" cy=\"54\" r=\"1.6\" fill=\"#2B2A5E\"/></svg>", "word-강아지": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"22\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"30\" cy=\"38\" rx=\"8\" ry=\"14\" fill=\"#E8B677\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-20 30 38)\"/><ellipse cx=\"70\" cy=\"38\" rx=\"8\" ry=\"14\" fill=\"#E8B677\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(20 70 38)\"/><circle cx=\"43\" cy=\"54\" r=\"2.8\" fill=\"#2B2A5E\"/><circle cx=\"57\" cy=\"54\" r=\"2.8\" fill=\"#2B2A5E\"/><path d=\"M 44 61 Q 50 66 56 61\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><ellipse cx=\"61\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><ellipse cx=\"50\" cy=\"64\" rx=\"4\" ry=\"3\" fill=\"#2B2A5E\"/></svg>", "word-고양이": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"56\" r=\"20\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"32,42 38,22 46,40\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><polygon points=\"68,42 62,22 54,40\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><circle cx=\"43\" cy=\"56\" r=\"2.8\" fill=\"#2B2A5E\"/><circle cx=\"57\" cy=\"56\" r=\"2.8\" fill=\"#2B2A5E\"/><path d=\"M 44 63 Q 50 68 56 63\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39\" cy=\"62\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><ellipse cx=\"61\" cy=\"62\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><line x1=\"30\" y1=\"60\" x2=\"42\" y2=\"58\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"30\" y1=\"66\" x2=\"42\" y2=\"64\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"60\" x2=\"58\" y2=\"58\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"66\" x2=\"58\" y2=\"64\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/></svg>", "word-코끼리": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"46\" cy=\"50\" r=\"22\" fill=\"#D8D8F0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"70\" cy=\"32\" rx=\"10\" ry=\"10\" fill=\"#D8D8F0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 60 60 Q 66 78 58 84 Q 54 84 56 74\" fill=\"#D8D8F0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"26\" cy=\"50\" rx=\"8\" ry=\"12\" fill=\"#D8D8F0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-10 26 50)\"/><circle cx=\"39\" cy=\"48\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"53\" cy=\"48\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 40 55 Q 46 60 52 55\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"35\" cy=\"54\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><ellipse cx=\"57\" cy=\"54\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/></svg>", "word-사자": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"14\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"54\" r=\"24\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"54\" r=\"15\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"43.5\" cy=\"54\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56.5\" cy=\"54\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 61 Q 50 66 56 61\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39.5\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60.5\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/></svg>", "word-토끼": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"40\" cy=\"24\" rx=\"6\" ry=\"18\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-8 40 24)\"/><ellipse cx=\"60\" cy=\"24\" rx=\"6\" ry=\"18\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(8 60 24)\"/><ellipse cx=\"40\" cy=\"24\" rx=\"3\" ry=\"12\" fill=\"#ffc9d8\" transform=\"rotate(-8 40 24)\"/><ellipse cx=\"60\" cy=\"24\" rx=\"3\" ry=\"12\" fill=\"#ffc9d8\" transform=\"rotate(8 60 24)\"/><circle cx=\"50\" cy=\"56\" r=\"20\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"43\" cy=\"56\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"57\" cy=\"56\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 63 Q 50 68 56 63\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39\" cy=\"62\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><ellipse cx=\"61\" cy=\"62\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/></svg>", "word-호랑이": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"22\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"30\" cy=\"38\" rx=\"7\" ry=\"11\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-15 30 38)\"/><ellipse cx=\"70\" cy=\"38\" rx=\"7\" ry=\"11\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(15 70 38)\"/><circle cx=\"43\" cy=\"54\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"57\" cy=\"54\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 61 Q 50 66 56 61\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><ellipse cx=\"61\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ffb0c4\" opacity=\"0.8\"/><line x1=\"32\" y1=\"44\" x2=\"38\" y2=\"42\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"30\" y1=\"50\" x2=\"38\" y2=\"50\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"68\" y1=\"44\" x2=\"62\" y2=\"42\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"50\" x2=\"62\" y2=\"50\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/></svg>", "word-판다": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"22\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"32\" cy=\"34\" r=\"9\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"68\" cy=\"34\" r=\"9\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"52\" rx=\"6\" ry=\"8\" fill=\"#2B2A5E\" transform=\"rotate(-10 40 52)\"/><ellipse cx=\"60\" cy=\"52\" rx=\"6\" ry=\"8\" fill=\"#2B2A5E\" transform=\"rotate(10 60 52)\"/><circle cx=\"40\" cy=\"52\" r=\"2.4\" fill=\"#fff\"/><circle cx=\"60\" cy=\"52\" r=\"2.4\" fill=\"#fff\"/><path d=\"M 44 64 Q 50 69 56 64\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-기린": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"50\" cy=\"66\" rx=\"18\" ry=\"14\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"44\" y=\"26\" width=\"12\" height=\"42\" rx=\"6\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"38\" cy=\"20\" rx=\"7\" ry=\"9\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"58\" cy=\"20\" rx=\"7\" ry=\"9\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"42\" cy=\"20\" r=\"1.6\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"20\" r=\"1.6\" fill=\"#2B2A5E\"/><circle cx=\"43.5\" cy=\"68\" r=\"2.4\" fill=\"#2B2A5E\"/><circle cx=\"56.5\" cy=\"68\" r=\"2.4\" fill=\"#2B2A5E\"/><path d=\"M 44 75 Q 50 80 56 75\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39.5\" cy=\"74\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60.5\" cy=\"74\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><circle cx=\"48\" cy=\"36\" r=\"2\" fill=\"#8a6d00\"/><circle cx=\"56\" cy=\"44\" r=\"2\" fill=\"#8a6d00\"/><circle cx=\"46\" cy=\"52\" r=\"2\" fill=\"#8a6d00\"/></svg>", "word-연필": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"46\" y=\"18\" width=\"10\" height=\"50\" rx=\"2\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"46,68 56,68 51,80\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><rect x=\"46\" y=\"15\" width=\"10\" height=\"6\" rx=\"1\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"49,76 53,76 51,80\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/></svg>", "word-지우개": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"28\" y=\"40\" width=\"44\" height=\"24\" rx=\"6\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"28\" y=\"40\" width=\"44\" height=\"10\" rx=\"6\" fill=\"#E6E1FF\"/></svg>", "word-가위": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"36\" cy=\"66\" r=\"9\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"62\" cy=\"66\" r=\"9\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"38\" y1=\"62\" x2=\"72\" y2=\"26\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"60\" y1=\"62\" x2=\"26\" y2=\"26\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/></svg>", "word-풀": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 38 32 L 62 32 L 66 78 Q 66 84 60 84 L 40 84 Q 34 84 34 78 Z\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"42\" y=\"20\" width=\"16\" height=\"14\" rx=\"4\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"46\" y=\"16\" width=\"8\" height=\"8\" rx=\"2\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-색연필": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"30\" y=\"24\" width=\"8\" height=\"50\" rx=\"2\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"30,74 38,74 34,84\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><rect x=\"46\" y=\"24\" width=\"8\" height=\"50\" rx=\"2\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"46,74 54,74 50,84\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><rect x=\"62\" y=\"24\" width=\"8\" height=\"50\" rx=\"2\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"62,74 70,74 66,84\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/></svg>", "word-필통": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"22\" y=\"40\" width=\"56\" height=\"30\" rx=\"10\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 22 46 Q 50 34 78 46\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"64\" cy=\"55\" r=\"4\" fill=\"#FFD23F\"/></svg>", "word-자": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"18\" y=\"44\" width=\"64\" height=\"16\" rx=\"4\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-6 50.0 52.0)\"/><line x1=\"26\" y1=\"44\" x2=\"26\" y2=\"52\" stroke=\"#2B2A5E\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"34\" y1=\"44\" x2=\"34\" y2=\"50\" stroke=\"#2B2A5E\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"42\" y1=\"44\" x2=\"42\" y2=\"52\" stroke=\"#2B2A5E\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"50\" y1=\"44\" x2=\"50\" y2=\"50\" stroke=\"#2B2A5E\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"58\" y1=\"44\" x2=\"58\" y2=\"52\" stroke=\"#2B2A5E\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>", "word-공책": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"26\" y=\"18\" width=\"48\" height=\"64\" rx=\"4\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"26\" y=\"18\" width=\"10\" height=\"64\" rx=\"4\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"44\" y1=\"30\" x2=\"66\" y2=\"30\" stroke=\"#cbd5e1\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"44\" y1=\"40\" x2=\"66\" y2=\"40\" stroke=\"#cbd5e1\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"44\" y1=\"50\" x2=\"66\" y2=\"50\" stroke=\"#cbd5e1\" stroke-width=\"2\" stroke-linecap=\"round\"/><line x1=\"44\" y1=\"60\" x2=\"66\" y2=\"60\" stroke=\"#cbd5e1\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>", "word-김밥": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"26\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"54\" r=\"20\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"54\" r=\"7\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"42\" cy=\"48\" r=\"2.4\" fill=\"#FF3E7F\"/><circle cx=\"58\" cy=\"60\" r=\"2.4\" fill=\"#2EC4B6\"/></svg>", "word-라면": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"50\" cy=\"64\" rx=\"28\" ry=\"12\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 26 64 Q 26 42 50 42 Q 74 42 74 64\" fill=\"#fff\"/><path d=\"M 34 50 Q 42 58 34 64 M 46 48 Q 54 58 46 66 M 58 50 Q 66 58 58 64\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-피자": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 50 20 L 82 74 L 18 74 Z\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 50 30 L 74 70 L 26 70 Z\" fill=\"#FF8C42\"/><circle cx=\"50\" cy=\"46\" r=\"3\" fill=\"#FF3E7F\"/><circle cx=\"42\" cy=\"58\" r=\"3\" fill=\"#2EC4B6\"/><circle cx=\"58\" cy=\"58\" r=\"3\" fill=\"#FF3E7F\"/></svg>", "word-치킨": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"50\" cy=\"58\" rx=\"22\" ry=\"18\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"46\" y=\"70\" width=\"8\" height=\"16\" rx=\"3\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"38\" cy=\"50\" r=\"2.4\" fill=\"#8a6d00\"/><circle cx=\"52\" cy=\"44\" r=\"2.4\" fill=\"#8a6d00\"/><circle cx=\"62\" cy=\"54\" r=\"2.4\" fill=\"#8a6d00\"/></svg>", "word-떡볶이": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"24\" y=\"50\" width=\"52\" height=\"16\" rx=\"6\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"28\" y=\"42\" width=\"6\" height=\"26\" rx=\"3\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"42\" y=\"42\" width=\"6\" height=\"26\" rx=\"3\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"56\" y=\"42\" width=\"6\" height=\"26\" rx=\"3\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"66\" cy=\"48\" r=\"2.4\" fill=\"#2EC4B6\"/></svg>", "word-짜장면": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"50\" cy=\"64\" rx=\"28\" ry=\"12\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 26 64 Q 26 42 50 42 Q 74 42 74 64\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"40\" cy=\"58\" r=\"3\" fill=\"#2EC4B6\"/><circle cx=\"58\" cy=\"60\" r=\"3\" fill=\"#FF3E7F\"/><circle cx=\"50\" cy=\"52\" r=\"3\" fill=\"#FFD23F\"/></svg>", "word-햄버거": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 24 44 Q 24 30 50 30 Q 76 30 76 44 Z\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"24\" y=\"44\" width=\"52\" height=\"8\" rx=\"2\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"24\" y=\"52\" width=\"52\" height=\"7\" rx=\"2\" fill=\"#8a4c1e\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"24\" y=\"59\" width=\"52\" height=\"7\" rx=\"2\" fill=\"#fff\"/><path d=\"M 24 66 L 76 66 Q 76 76 50 76 Q 24 76 24 66 Z\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"34\" cy=\"38\" r=\"1.6\" fill=\"#fff\"/><circle cx=\"44\" cy=\"36\" r=\"1.6\" fill=\"#fff\"/><circle cx=\"56\" cy=\"36\" r=\"1.6\" fill=\"#fff\"/><circle cx=\"66\" cy=\"38\" r=\"1.6\" fill=\"#fff\"/></svg>", "word-초밥": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"28\" y=\"58\" width=\"44\" height=\"16\" rx=\"5\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"50\" cy=\"54\" rx=\"24\" ry=\"12\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"28\" y=\"58\" width=\"10\" height=\"16\" rx=\"3\" fill=\"#2EC4B6\"/></svg>", "word-의사": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"42\" r=\"16\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44\" cy=\"42\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"42\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 49 Q 50 54 56 49\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40\" cy=\"48\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60\" cy=\"48\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"34\" y=\"58\" width=\"32\" height=\"24\" rx=\"6\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 50 58 Q 44 66 50 66 Q 56 66 50 58\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"74\" r=\"4\" fill=\"#8B7FE8\"/></svg>", "word-선생님": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"40\" r=\"15\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44\" cy=\"40\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"40\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 47 Q 50 52 56 47\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40\" cy=\"46\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60\" cy=\"46\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"32\" y=\"56\" width=\"36\" height=\"26\" rx=\"6\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"22\" y=\"74\" width=\"56\" height=\"8\" rx=\"2\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-경찰관": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"42\" r=\"15\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 34 38 Q 34 24 50 24 Q 66 24 66 38 L 66 32 Q 50 20 34 32 Z\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"26\" r=\"2\" fill=\"#FFD23F\"/><circle cx=\"44\" cy=\"44\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"44\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 51 Q 50 56 56 51\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40\" cy=\"50\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60\" cy=\"50\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"32\" y=\"58\" width=\"36\" height=\"24\" rx=\"6\" fill=\"#3b3a8f\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"66\" r=\"4\" fill=\"#FFD23F\"/></svg>", "word-소방관": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"44\" r=\"15\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 32 40 A 18 18 0 0 1 68 40 Z\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"30\" y=\"38\" width=\"40\" height=\"7\" rx=\"2\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44\" cy=\"46\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"46\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 53 Q 50 58 56 53\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40\" cy=\"52\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60\" cy=\"52\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"32\" y=\"60\" width=\"36\" height=\"22\" rx=\"6\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-요리사": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"50\" r=\"15\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 34 40 Q 34 20 50 20 Q 66 20 66 40 Q 60 34 50 38 Q 40 34 34 40 Z\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"44\" cy=\"52\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56\" cy=\"52\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 59 Q 50 64 56 59\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40\" cy=\"58\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60\" cy=\"58\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"32\" y=\"64\" width=\"36\" height=\"20\" rx=\"6\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-가수": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"40\" r=\"14\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44.5\" cy=\"40\" r=\"2.4\" fill=\"#2B2A5E\"/><circle cx=\"55.5\" cy=\"40\" r=\"2.4\" fill=\"#2B2A5E\"/><path d=\"M 44 47 Q 50 52 56 47\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40.5\" cy=\"46\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"59.5\" cy=\"46\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"40\" y=\"60\" width=\"20\" height=\"20\" rx=\"6\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"50\" cy=\"60\" rx=\"9\" ry=\"7\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"48\" y=\"52\" width=\"4\" height=\"10\" rx=\"2\" fill=\"#8a8a8a\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-화가": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"42\" r=\"14\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44.5\" cy=\"42\" r=\"2.4\" fill=\"#2B2A5E\"/><circle cx=\"55.5\" cy=\"42\" r=\"2.4\" fill=\"#2B2A5E\"/><path d=\"M 44 49 Q 50 54 56 49\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40.5\" cy=\"48\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"59.5\" cy=\"48\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><path d=\"M 30 66 Q 30 56 50 58 Q 70 56 70 68 Q 70 78 50 76 Q 30 78 30 66 Z\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"40\" cy=\"66\" r=\"3\" fill=\"#FF3E7F\"/><circle cx=\"50\" cy=\"70\" r=\"3\" fill=\"#FFD23F\"/><circle cx=\"60\" cy=\"64\" r=\"3\" fill=\"#2EC4B6\"/></svg>", "word-운동선수": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"38\" r=\"14\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44.5\" cy=\"38\" r=\"2.4\" fill=\"#2B2A5E\"/><circle cx=\"55.5\" cy=\"38\" r=\"2.4\" fill=\"#2B2A5E\"/><path d=\"M 44 45 Q 50 50 56 45\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40.5\" cy=\"44\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"59.5\" cy=\"44\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><rect x=\"36\" y=\"54\" width=\"28\" height=\"22\" rx=\"6\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"50\" r=\"8\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-축구": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"24\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"50,40 60,48 56,60 44,60 40,48\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/></svg>", "word-야구": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"22\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 32 40 Q 50 50 32 68\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 68 40 Q 50 50 68 68\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-농구": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"24\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"50\" y1=\"30\" x2=\"50\" y2=\"78\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><path d=\"M 26 54 L 74 54 M 30 36 Q 50 54 30 72 M 70 36 Q 50 54 70 72\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-수영": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 20 60 Q 30 52 40 60 Q 50 68 60 60 Q 70 52 80 60\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"56\" cy=\"36\" r=\"10\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 46 34 Q 56 24 66 34\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-줄넘기": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 30 30 Q 10 54 30 78\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 70 30 Q 90 54 70 78\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"30\" cy=\"30\" r=\"7\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"70\" cy=\"30\" r=\"7\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-태권도": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"30\" y=\"20\" width=\"40\" height=\"50\" rx=\"8\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"30\" y=\"50\" width=\"40\" height=\"8\" rx=\"0\" fill=\"#FF3E7F\"/><circle cx=\"50\" cy=\"32\" r=\"10\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-배드민턴": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"56\" cy=\"34\" rx=\"12\" ry=\"16\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(20 56 34)\"/><line x1=\"56\" y1=\"50\" x2=\"56\" y2=\"60\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><rect x=\"46\" y=\"58\" width=\"20\" height=\"6\" rx=\"2\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(8 56.0 61.0)\"/></svg>", "word-달리기": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"56\" cy=\"32\" r=\"9\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 56 42 L 48 60 L 34 66\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 56 42 L 66 54 L 78 50\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 48 60 L 40 78\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-자동차": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"18\" y=\"48\" width=\"64\" height=\"20\" rx=\"8\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"30\" y=\"34\" width=\"32\" height=\"18\" rx=\"6\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"34\" y=\"38\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#D6F7F1\"/><rect x=\"48\" y=\"38\" width=\"10\" height=\"10\" rx=\"2\" fill=\"#D6F7F1\"/><circle cx=\"34\" cy=\"70\" r=\"8\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"34\" cy=\"70\" r=\"3\" fill=\"#fff\"/><circle cx=\"66\" cy=\"70\" r=\"8\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"66\" cy=\"70\" r=\"3\" fill=\"#fff\"/></svg>", "word-버스": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"18\" y=\"28\" width=\"64\" height=\"42\" rx=\"8\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"24\" y=\"36\" width=\"14\" height=\"12\" rx=\"2\" fill=\"#D6F7F1\"/><rect x=\"42\" y=\"36\" width=\"14\" height=\"12\" rx=\"2\" fill=\"#D6F7F1\"/><rect x=\"60\" y=\"36\" width=\"14\" height=\"12\" rx=\"2\" fill=\"#D6F7F1\"/><circle cx=\"32\" cy=\"72\" r=\"8\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"32\" cy=\"72\" r=\"3\" fill=\"#fff\"/><circle cx=\"68\" cy=\"72\" r=\"8\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"68\" cy=\"72\" r=\"3\" fill=\"#fff\"/></svg>", "word-기차": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"16\" y=\"32\" width=\"68\" height=\"36\" rx=\"10\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"24\" y=\"40\" width=\"16\" height=\"14\" rx=\"3\" fill=\"#fff\"/><rect x=\"48\" y=\"40\" width=\"16\" height=\"14\" rx=\"3\" fill=\"#fff\"/><circle cx=\"28\" cy=\"74\" r=\"6\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"46\" cy=\"74\" r=\"6\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"64\" cy=\"74\" r=\"6\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-비행기": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"50\" cy=\"50\" rx=\"28\" ry=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><polygon points=\"50,32 58,50 42,50\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><polygon points=\"72,44 86,50 72,56\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><ellipse cx=\"30\" cy=\"50\" rx=\"5\" ry=\"3\" fill=\"#fff\"/></svg>", "word-배": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 20 60 L 80 60 L 68 76 L 32 76 Z\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"46\" y=\"26\" width=\"6\" height=\"34\" rx=\"1\" fill=\"#8a6d00\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 52 28 L 74 50 L 52 50 Z\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-자전거": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"32\" cy=\"66\" r=\"16\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"68\" cy=\"66\" r=\"16\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"32\" y1=\"66\" x2=\"50\" y2=\"40\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"68\" y1=\"66\" x2=\"50\" y2=\"40\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"32\" y1=\"66\" x2=\"52\" y2=\"66\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"50\" y1=\"40\" x2=\"58\" y2=\"40\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"34\" r=\"7\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-오토바이": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"30\" cy=\"70\" r=\"12\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"70\" cy=\"70\" r=\"12\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 30 70 L 50 46 L 70 70 M 50 46 L 50 36\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"42\" y=\"32\" width=\"16\" height=\"8\" rx=\"3\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-지하철": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"18\" y=\"26\" width=\"64\" height=\"44\" rx=\"12\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"26\" y=\"34\" width=\"20\" height=\"16\" rx=\"3\" fill=\"#D6F7F1\"/><rect x=\"54\" y=\"34\" width=\"20\" height=\"16\" rx=\"3\" fill=\"#D6F7F1\"/><circle cx=\"50\" cy=\"78\" r=\"6\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-로봇": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"32\" y=\"34\" width=\"36\" height=\"34\" rx=\"8\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"40\" y=\"20\" width=\"20\" height=\"14\" rx=\"4\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"46\" cy=\"26\" r=\"3\" fill=\"#FFD23F\"/><circle cx=\"54\" cy=\"26\" r=\"3\" fill=\"#FFD23F\"/><circle cx=\"42\" cy=\"48\" r=\"3\" fill=\"#fff\"/><circle cx=\"58\" cy=\"48\" r=\"3\" fill=\"#fff\"/><rect x=\"40\" y=\"58\" width=\"20\" height=\"6\" rx=\"2\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"20\" y=\"40\" width=\"10\" height=\"20\" rx=\"3\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"70\" y=\"40\" width=\"10\" height=\"20\" rx=\"3\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-인형": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"38\" r=\"14\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"44.5\" cy=\"38\" r=\"2.4\" fill=\"#2B2A5E\"/><circle cx=\"55.5\" cy=\"38\" r=\"2.4\" fill=\"#2B2A5E\"/><path d=\"M 44 45 Q 50 50 56 45\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"40.5\" cy=\"44\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"59.5\" cy=\"44\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"30\" cy=\"38\" rx=\"4\" ry=\"7\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-20 30 38)\"/><ellipse cx=\"70\" cy=\"38\" rx=\"4\" ry=\"7\" fill=\"#F5D6A8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(20 70 38)\"/><path d=\"M 34 54 Q 50 48 66 54 L 62 80 Q 50 86 38 80 Z\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-블록": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"24\" y=\"26\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"54\" y=\"26\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"24\" y=\"56\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><rect x=\"54\" y=\"56\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/></svg>", "word-공": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"54\" r=\"24\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 26 54 Q 50 40 74 54 M 26 54 Q 50 68 74 54 M 50 30 L 50 78\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-팽이": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><polygon points=\"50,80 34,44 66,44\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\"/><ellipse cx=\"50\" cy=\"40\" rx=\"22\" ry=\"10\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"50\" cy=\"40\" r=\"5\" fill=\"#FFD23F\"/></svg>", "word-딱지": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"24\" y=\"30\" width=\"52\" height=\"44\" rx=\"6\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-6 50.0 52.0)\"/><rect x=\"30\" y=\"36\" width=\"40\" height=\"32\" rx=\"4\" fill=\"#FFD23F\" transform=\"rotate(-6 50.0 52.0)\"/></svg>", "word-풍선": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"44\" r=\"20\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"50\" y1=\"64\" x2=\"50\" y2=\"82\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><polygon points=\"46,64 54,64 50,70\" fill=\"#FF3E7F\"/></svg>", "word-퍼즐": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><rect x=\"26\" y=\"26\" width=\"44\" height=\"44\" rx=\"6\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"70\" cy=\"40\" r=\"8\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"40\" cy=\"70\" r=\"8\" fill=\"#fff\"/></svg>", "word-봄": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><ellipse cx=\"50\" cy=\"60\" rx=\"10\" ry=\"16\" fill=\"#2EC4B6\"/><circle cx=\"50\" cy=\"38\" r=\"10\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"38\" cy=\"44\" rx=\"7\" ry=\"4\" fill=\"#FFB3C6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(40 38 44)\"/><ellipse cx=\"62\" cy=\"44\" rx=\"7\" ry=\"4\" fill=\"#FFB3C6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" transform=\"rotate(-40 62 44)\"/><ellipse cx=\"50\" cy=\"30\" rx=\"4\" ry=\"7\" fill=\"#FFB3C6\"/></svg>", "word-여름": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"18\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"50\" y1=\"20\" x2=\"50\" y2=\"28\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"50\" y1=\"76\" x2=\"50\" y2=\"84\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"20\" y1=\"52\" x2=\"28\" y2=\"52\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"72\" y1=\"52\" x2=\"80\" y2=\"52\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"30\" y1=\"32\" x2=\"36\" y2=\"38\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"32\" x2=\"64\" y2=\"38\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"30\" y1=\"72\" x2=\"36\" y2=\"66\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"70\" y1=\"72\" x2=\"64\" y2=\"66\" stroke=\"#2B2A5E\" stroke-width=\"3\" stroke-linecap=\"round\"/></svg>", "word-가을": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 50 26 Q 30 30 30 50 Q 30 70 50 78 Q 70 70 70 50 Q 70 30 50 26 Z\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><line x1=\"50\" y1=\"26\" x2=\"50\" y2=\"78\" stroke=\"#8a4c1e\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg>", "word-겨울": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"20\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"50\" y1=\"32\" x2=\"50\" y2=\"72\" stroke=\"#2B2A5E\" stroke-width=\"2.4\" stroke-linecap=\"round\"/><line x1=\"30\" y1=\"52\" x2=\"70\" y2=\"52\" stroke=\"#2B2A5E\" stroke-width=\"2.4\" stroke-linecap=\"round\"/><line x1=\"36\" y1=\"38\" x2=\"64\" y2=\"66\" stroke=\"#2B2A5E\" stroke-width=\"2.4\" stroke-linecap=\"round\"/><line x1=\"64\" y1=\"38\" x2=\"36\" y2=\"66\" stroke=\"#2B2A5E\" stroke-width=\"2.4\" stroke-linecap=\"round\"/></svg>", "word-비": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 26 44 Q 26 30 40 32 Q 44 22 56 26 Q 68 22 70 34 Q 82 34 80 46 Q 80 52 72 52 L 32 52 Q 26 52 26 44 Z\" fill=\"#D6D6EE\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><line x1=\"36\" y1=\"58\" x2=\"32\" y2=\"68\" stroke=\"#8B7FE8\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"50\" y1=\"58\" x2=\"46\" y2=\"68\" stroke=\"#8B7FE8\" stroke-width=\"3\" stroke-linecap=\"round\"/><line x1=\"64\" y1=\"58\" x2=\"60\" y2=\"68\" stroke=\"#8B7FE8\" stroke-width=\"3\" stroke-linecap=\"round\"/></svg>", "word-눈": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"38\" cy=\"58\" r=\"10\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"54\" cy=\"44\" r=\"7\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"62\" cy=\"60\" r=\"5\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"34\" cy=\"58\" r=\"2\" fill=\"#2B2A5E\"/><circle cx=\"42\" cy=\"58\" r=\"2\" fill=\"#2B2A5E\"/></svg>", "word-무지개": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 20 74 A 30 30 0 0 1 80 74\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 28 74 A 22 22 0 0 1 72 74\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 34 74 A 16 16 0 0 1 66 74\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-태풍": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><path d=\"M 30 40 Q 50 30 68 40 Q 50 44 34 50\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 32 54 Q 50 48 66 54 Q 50 58 36 62\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M 38 66 Q 50 62 60 66\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/></svg>", "word-빨강": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE1EC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#FF3E7F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#fff\" transform=\"rotate(-30 40 42)\"/></svg>", "word-노랑": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#FFD23F\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#fff\" transform=\"rotate(-30 40 42)\"/></svg>", "word-파랑": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#3E7FFF\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#fff\" transform=\"rotate(-30 40 42)\"/></svg>", "word-초록": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#2EC4B6\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#fff\" transform=\"rotate(-30 40 42)\"/></svg>", "word-보라": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#8B7FE8\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#fff\" transform=\"rotate(-30 40 42)\"/></svg>", "word-주황": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFE4CC\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#FF8C42\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#fff\" transform=\"rotate(-30 40 42)\"/></svg>", "word-검정": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#D6F7F1\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#5a5a8a\" transform=\"rotate(-30 40 42)\"/></svg>", "word-하양": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#FFF3C4\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"24\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><ellipse cx=\"40\" cy=\"42\" rx=\"7\" ry=\"4\" fill=\"#eee\" transform=\"rotate(-30 40 42)\"/></svg>", "liar-detective": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"4\" y=\"4\" width=\"92\" height=\"92\" rx=\"26\" fill=\"#E6E1FF\" stroke=\"#2B2A5E\" stroke-width=\"3\"/><ellipse cx=\"50\" cy=\"86\" rx=\"26\" ry=\"4.5\" fill=\"#000\" opacity=\"0.10\"/><circle cx=\"50\" cy=\"52\" r=\"17\" fill=\"#FFD9A0\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><path d=\"M 32 46 Q 32 28 50 28 Q 68 28 68 46 L 68 40 Q 50 24 32 40 Z\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"28\" y=\"38\" width=\"44\" height=\"7\" rx=\"3\" fill=\"#2B2A5E\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><circle cx=\"43.5\" cy=\"54\" r=\"2.6\" fill=\"#2B2A5E\"/><circle cx=\"56.5\" cy=\"54\" r=\"2.6\" fill=\"#2B2A5E\"/><path d=\"M 44 61 Q 50 66 56 61\" fill=\"none\" stroke=\"#2B2A5E\" stroke-width=\"2.6\" stroke-linecap=\"round\"/><ellipse cx=\"39.5\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><ellipse cx=\"60.5\" cy=\"60\" rx=\"4\" ry=\"2.6\" fill=\"#ff9fb8\" opacity=\"0.8\"/><circle cx=\"74\" cy=\"64\" r=\"10\" fill=\"#fff\" stroke=\"#2B2A5E\" stroke-width=\"3.4\"/><line x1=\"81\" y1=\"71\" x2=\"88\" y2=\"78\" stroke=\"#2B2A5E\" stroke-width=\"4\" stroke-linecap=\"round\"/></svg>"};
+
+
+/* =========================================================
+   사운드 (Web Audio 합성음 — 외부 파일 불필요)
+   ========================================================= */
+let actx = null;
+function ensureAudio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(freq, start, dur, type='sine', vol=0.18){
+  const ctx = ensureAudio(); if(!ctx) return;
+  const o = ctx.createOscillator(); const g = ctx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, ctx.currentTime+start);
+  g.gain.linearRampToValueAtTime(vol, ctx.currentTime+start+0.02);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+start+dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(ctx.currentTime+start); o.stop(ctx.currentTime+start+dur+0.05);
+}
+function sfxTurn(){ tone(660,0,.12,'triangle'); tone(880,.12,.16,'triangle'); }
+function sfxTopic(){ tone(523,0,.1,'sine'); tone(659,.1,.1,'sine'); tone(784,.2,.18,'sine'); }
+function sfxVote(){ tone(392,0,.1,'square',0.12); tone(523,.12,.14,'square',0.12); }
+function sfxResult(){ tone(523,0,.12,'sawtooth',0.12); tone(659,.13,.12,'sawtooth',0.12); tone(784,.26,.12,'sawtooth',0.12); tone(1046,.39,.28,'sawtooth',0.14); }
+function sfxTick(){ tone(880,0,.05,'square',0.08); }
+
+/* =========================================================
+   배경 장식: 떠다니는 이모지 & 색종이(confetti) 효과
+   ========================================================= */
+const FLOAT_EMOJIS = ['🍎','🔍','⭐','🎈','🃏','🐶','🎉','🌈','⚽','🧩'];
+function initFloatLayer(){
+  const layer = document.getElementById('float-layer');
+  if(!layer) return;
+  let html = '';
+  for(let i=0;i<14;i++){
+    const em = FLOAT_EMOJIS[Math.floor(Math.random()*FLOAT_EMOJIS.length)];
+    const left = Math.random()*100;
+    const dur = 14 + Math.random()*14;
+    const delay = Math.random()*-20;
+    const size = 18 + Math.random()*22;
+    html += `<span style="left:${left}%; font-size:${size}px; animation-duration:${dur}s; animation-delay:${delay}s;">${em}</span>`;
+  }
+  layer.innerHTML = html;
+}
+
+const CONFETTI_COLORS = ['#FF3E7F','#FFD23F','#2EC4B6','#8B7FE8','#FF8C42'];
+function burstConfetti(count=60){
+  const layer = document.getElementById('confetti-layer');
+  if(!layer) return;
+  for(let i=0;i<count;i++){
+    const el = document.createElement('div');
+    const color = CONFETTI_COLORS[Math.floor(Math.random()*CONFETTI_COLORS.length)];
+    const left = Math.random()*100;
+    const size = 6 + Math.random()*8;
+    const dur = 2.2 + Math.random()*1.6;
+    const delay = Math.random()*0.4;
+    const shape = Math.random()>0.5 ? '50%' : '3px';
+    el.style.cssText = `position:absolute; top:-20px; left:${left}%; width:${size}px; height:${size*0.6}px; background:${color}; border-radius:${shape}; animation:confettiFall ${dur}s ease-in ${delay}s forwards;`;
+    layer.appendChild(el);
+    setTimeout(()=>el.remove(), (dur+delay)*1000+200);
+  }
+}
+initFloatLayer();
+
+/* =========================================================
+   전역 상태
+   ========================================================= */
+let myRoomCode = null;
+let myPlayerId = null;
+let myIsAdmin = false;
+let isBoard = false;
+let roomListenerRef = null;
+let selectedVotes = [];
+let cachedRoomData = null;
+let timerInterval = null;
+let lastKnownTurnIndex = -1;
+let lastKnownStatus = null;
+let boardChatSeen = 0;
+let settings = { maxPlayers:6, turnTime:30, liarCount:1 };
+
+function getCategoryIcon(cat){ return ICON_SVG['cat-'+cat] || ''; }
+function getWordIcon(word){ return ICON_SVG['word-'+word] || ''; }
+
+function initRoleIcons(){
+  const map = { 'icon-role-admin':'role-admin', 'icon-role-player':'role-player', 'icon-role-board':'role-board' };
+  Object.entries(map).forEach(([elId, iconKey])=>{
+    const el = document.getElementById(elId);
+    if(el && ICON_SVG[iconKey]) el.innerHTML = ICON_SVG[iconKey];
+  });
+}
+initRoleIcons();
+
+function checkConfig(){
+  if(!firebaseReady){
+    document.getElementById('config-warning').innerHTML =
+      '<div class="setup-warning">⚠️ Firebase 설정이 아직 안 되어 있어요.<br>파일 상단의 <code>firebaseConfig</code> 값을 본인의 Firebase 프로젝트 정보로 채워주세요. (Realtime Database 사용)</div>';
+  }
+}
+checkConfig();
+
+function goTo(screenName){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+screenName).classList.add('active');
+}
+
+function stepVal(key, delta, min, max){
+  settings[key] = Math.max(min, Math.min(max, settings[key]+delta));
+  document.getElementById('val-'+key).textContent = settings[key];
+}
+
+function genRoomCode(){ return String(Math.floor(1000 + Math.random()*9000)); }
+function genPlayerId(){ return 'p_' + Math.random().toString(36).slice(2,10); }
+function initials(name){ return name ? name.trim().slice(0,1) : '?'; }
+
+/* =========================================================
+   관리자: 방 생성
+   ========================================================= */
+function createRoom(){
+  if(!requireFirebase('adminSetupError')) return;
+  const code = genRoomCode();
+  myRoomCode = code;
+  myIsAdmin = true;
+  const roomData = {
+    settings: { maxPlayers: settings.maxPlayers, turnTime: settings.turnTime, liarCount: settings.liarCount },
+    status: 'lobby',
+    createdAt: Date.now(),
+    players: {},
+    chat: {},
+    votes: {},
+    turnOrder: [],
+    currentTurnIndex: -1,
+    currentCategory: null,
+    liars: {},
+    normalWord: null,
+    turnEndAt: 0
+  };
+  db.ref('rooms/'+code).set(roomData).then(()=>{
+    document.getElementById('admin-roomcode').textContent = code;
+    document.getElementById('admin-settings-summary').textContent =
+      `최대 ${settings.maxPlayers}명 · ${settings.turnTime}초 · 라이어 ${settings.liarCount}명`;
+    goTo('adminRoom');
+    listenRoom(code, renderAdmin);
+  }).catch(err=>{
+    document.getElementById('adminSetupError').textContent = '방 생성 실패: '+err.message;
+  });
+}
+
+function requireFirebase(errId){
+  if(!firebaseReady){
+    document.getElementById(errId).textContent = '⚠️ Firebase 설정이 되어있지 않습니다. 코드 상단의 firebaseConfig를 채워주세요.';
+    return false;
+  }
+  return true;
+}
+
+/* =========================================================
+   참가자: 참여
+   ========================================================= */
+function joinRoom(){
+  if(!requireFirebase('joinError')) return;
+  const code = document.getElementById('join-code').value.trim();
+  const name = document.getElementById('join-name').value.trim();
+  if(!/^\d{4}$/.test(code)){ document.getElementById('joinError').textContent = '참여코드 4자리를 입력해주세요.'; return; }
+  if(!name){ document.getElementById('joinError').textContent = '이름을 입력해주세요.'; return; }
+
+  db.ref('rooms/'+code).once('value').then(snap=>{
+    if(!snap.exists()){ document.getElementById('joinError').textContent = '존재하지 않는 참여코드예요.'; return; }
+    const room = snap.val();
+    if(room.status !== 'lobby'){ document.getElementById('joinError').textContent = '이미 게임이 시작되었어요.'; return; }
+    const currentCount = room.players ? Object.keys(room.players).length : 0;
+    if(currentCount >= room.settings.maxPlayers){ document.getElementById('joinError').textContent = '방 인원이 가득 찼어요.'; return; }
+
+    const pid = genPlayerId();
+    myPlayerId = pid; myRoomCode = code; myIsAdmin = false;
+    db.ref(`rooms/${code}/players/${pid}`).set({ name, score:0, joinedAt: Date.now() }).then(()=>{
+      document.getElementById('player-roomcode-pill').textContent = '코드 '+code;
+      goTo('playerRoom');
+      listenRoom(code, renderPlayer);
+      db.ref(`rooms/${code}/players/${pid}`).onDisconnect().update({ connected:false });
+    });
+  });
+}
+
+/* =========================================================
+   전자칠판 참여
+   ========================================================= */
+function joinBoard(){
+  if(!requireFirebase('boardJoinError')) return;
+  const code = document.getElementById('board-code').value.trim();
+  if(!/^\d{4}$/.test(code)){ document.getElementById('boardJoinError').textContent = '참여코드 4자리를 입력해주세요.'; return; }
+  db.ref('rooms/'+code).once('value').then(snap=>{
+    if(!snap.exists()){ document.getElementById('boardJoinError').textContent = '존재하지 않는 참여코드예요.'; return; }
+    myRoomCode = code; isBoard = true;
+    document.getElementById('board-roomcode').textContent = code;
+    goTo('board');
+    listenRoom(code, renderBoard);
+  });
+}
+
+function leaveRoom(){
+  stopTimerLoop();
+  if(roomListenerRef) roomListenerRef.off();
+  if(myPlayerId && myRoomCode && !myIsAdmin){
+    db.ref(`rooms/${myRoomCode}/players/${myPlayerId}`).remove();
+  }
+  myRoomCode = null; myPlayerId = null; myIsAdmin = false; isBoard = false; cachedRoomData = null;
+  goTo('home');
+}
+
+/* =========================================================
+   Realtime listener
+   ========================================================= */
+function listenRoom(code, renderFn){
+  if(roomListenerRef) roomListenerRef.off();
+  roomListenerRef = db.ref('rooms/'+code);
+  roomListenerRef.on('value', snap=>{
+    const data = snap.val();
+    if(!data){ return; }
+    const prevStatus = lastKnownStatus;
+    const prevTurn = lastKnownTurnIndex;
+    cachedRoomData = data;
+    renderFn(data);
+    if(data.status === 'playing' && data.currentTurnIndex !== prevTurn){
+      sfxTurn();
+      lastKnownTurnIndex = data.currentTurnIndex;
+    }
+    if(data.status !== prevStatus){
+      if(data.status === 'topic') sfxTopic();
+      if(data.status === 'voting') sfxVote();
+      if(data.status === 'results'){ sfxResult(); burstConfetti(70); }
+      lastKnownStatus = data.status;
+    }
+  });
+}
+
+/* =========================================================
+   ADMIN: 게임 진행 로직
+   ========================================================= */
+function startTopicDraw(){
+  const cats = Object.keys(CATEGORIES);
+  const pick = cats[Math.floor(Math.random()*cats.length)];
+  db.ref('rooms/'+myRoomCode).update({
+    status: 'topic',
+    currentCategory: pick,
+    normalWord: null,
+    liars: {},
+    turnOrder: [],
+    currentTurnIndex: -1,
+    chat: {},
+    votes: {},
+    turnEndAt: 0
+  });
+}
+
+function assignRoles(){
+  const room = cachedRoomData;
+  if(!room || !room.players){ return; }
+  const playerIds = Object.keys(room.players);
+  const liarCount = Math.min(room.settings.liarCount, Math.max(1, playerIds.length-1));
+  const shuffled = [...playerIds].sort(()=>Math.random()-0.5);
+  const liars = {};
+  shuffled.slice(0, liarCount).forEach(id=>{ liars[id] = true; });
+
+  const words = CATEGORIES[room.currentCategory];
+  const wordObj = words[Math.floor(Math.random()*words.length)];
+
+  const turnOrder = [...playerIds].sort(()=>Math.random()-0.5);
+
+  db.ref('rooms/'+myRoomCode).update({
+    status: 'assigned',
+    liars,
+    normalWord: wordObj,
+    turnOrder,
+    currentTurnIndex: -1
+  });
+}
+
+function startPlaying(){
+  db.ref('rooms/'+myRoomCode).update({
+    status: 'playing',
+    currentTurnIndex: 0,
+    turnEndAt: Date.now() + cachedRoomData.settings.turnTime*1000
+  });
+}
+
+function nextTurn(){
+  const room = cachedRoomData;
+  const idx = Math.min(room.currentTurnIndex+1, room.turnOrder.length);
+  db.ref('rooms/'+myRoomCode).update({
+    currentTurnIndex: idx,
+    turnEndAt: idx < room.turnOrder.length ? Date.now() + room.settings.turnTime*1000 : 0
+  });
+}
+function prevTurn(){
+  const room = cachedRoomData;
+  const idx = Math.max(room.currentTurnIndex-1, 0);
+  db.ref('rooms/'+myRoomCode).update({
+    currentTurnIndex: idx,
+    turnEndAt: Date.now() + room.settings.turnTime*1000
+  });
+}
+
+function startVoting(){
+  db.ref('rooms/'+myRoomCode).update({ status:'voting', votes:{} });
+}
+
+function revealResults(){
+  const room = cachedRoomData;
+  const liarIds = Object.keys(room.liars||{});
+  const liarCount = liarIds.length;
+  const votes = room.votes || {};
+  const playerIds = Object.keys(room.players);
+
+  // tally
+  const tally = {};
+  playerIds.forEach(id=>tally[id]=0);
+  Object.values(votes).forEach(voteArr=>{
+    (voteArr.picks||[]).forEach(pickId=>{ tally[pickId] = (tally[pickId]||0)+1; });
+  });
+  const sortedByVotes = [...playerIds].sort((a,b)=> (tally[b]||0)-(tally[a]||0));
+  const caughtSet = new Set(sortedByVotes.slice(0, liarCount));
+
+  const scoreDeltas = {};
+  playerIds.forEach(id=>scoreDeltas[id]=0);
+
+  liarIds.forEach(lid=>{
+    scoreDeltas[lid] = caughtSet.has(lid) ? -1 : 3;
+  });
+
+  playerIds.forEach(id=>{
+    if(liarIds.includes(id)) return;
+    const myPicks = (votes[id] && votes[id].picks) || [];
+    let correct = 0;
+    myPicks.forEach(p=>{ if(liarIds.includes(p)) correct++; });
+    scoreDeltas[id] = correct;
+  });
+
+  const updates = {};
+  playerIds.forEach(id=>{
+    const newScore = (room.players[id].score||0) + scoreDeltas[id];
+    updates[`players/${id}/score`] = newScore;
+    updates[`players/${id}/lastDelta`] = scoreDeltas[id];
+    updates[`players/${id}/wasLiar`] = liarIds.includes(id);
+    updates[`players/${id}/wasCaught`] = liarIds.includes(id) ? caughtSet.has(id) : null;
+    updates[`players/${id}/voteCount`] = tally[id]||0;
+  });
+  updates['status'] = 'results';
+  db.ref('rooms/'+myRoomCode).update(updates);
+}
+
+function resetScoresConfirm(){
+  if(!cachedRoomData || !cachedRoomData.players) return;
+  const updates = {};
+  Object.keys(cachedRoomData.players).forEach(id=>{ updates[`players/${id}/score`] = 0; });
+  db.ref('rooms/'+myRoomCode).update(updates);
+}
+
+/* =========================================================
+   RENDER: ADMIN
+   ========================================================= */
+function renderAdmin(room){
+  document.getElementById('admin-roomcode').textContent = myRoomCode;
+  document.getElementById('admin-settings-summary').textContent =
+    `최대 ${room.settings.maxPlayers}명 · ${room.settings.turnTime}초 · 라이어 ${room.settings.liarCount}명`;
+
+  ['admin-lobby-panel','admin-topic-panel','admin-assigned-panel','admin-playing-panel','admin-voting-panel','admin-results-panel']
+    .forEach(id=>document.getElementById(id).classList.add('hidden'));
+
+  const players = room.players || {};
+  const pIds = Object.keys(players);
+
+  // score list (always visible)
+  document.getElementById('admin-score-count').textContent = pIds.length;
+  document.getElementById('admin-score-list').innerHTML = pIds.map(id=>{
+    const p = players[id];
+    return `<li><span class="pname"><span class="avatar">${initials(p.name)}</span>${p.name}</span><span class="score-badge">${p.score||0}점</span></li>`;
+  }).join('') || '<li style="justify-content:center;color:var(--muted);">아직 참가자가 없어요</li>';
+
+  if(room.status === 'lobby'){
+    document.getElementById('admin-lobby-panel').classList.remove('hidden');
+    document.getElementById('admin-player-list').innerHTML = pIds.map(id=>{
+      const p = players[id];
+      return `<li><span class="pname"><span class="avatar">${initials(p.name)}</span>${p.name}</span></li>`;
+    }).join('') || '<li style="justify-content:center;color:var(--muted);">참가자를 기다리는 중...</li>';
+    document.getElementById('admin-start-btn').disabled = pIds.length < 3;
+    document.getElementById('admin-lobby-error').textContent = pIds.length < 3 ? '최소 3명 이상 모여야 시작할 수 있어요.' : '';
+  }
+  else if(room.status === 'topic'){
+    document.getElementById('admin-topic-panel').classList.remove('hidden');
+    document.getElementById('admin-topic-em').innerHTML = getCategoryIcon(room.currentCategory);
+    document.getElementById('admin-topic-name').textContent = room.currentCategory;
+  }
+  else if(room.status === 'assigned'){
+    document.getElementById('admin-assigned-panel').classList.remove('hidden');
+    document.getElementById('admin-reveal-status').innerHTML = pIds.map(id=>{
+      const p = players[id];
+      const isLiar = room.liars && room.liars[id];
+      return `<li><span class="pname"><span class="avatar">${initials(p.name)}</span>${p.name}</span>${isLiar?'<span class="score-badge" style="color:var(--pink);">🕵️ 라이어</span>':''}</li>`;
+    }).join('');
+  }
+  else if(room.status === 'playing'){
+    document.getElementById('admin-playing-panel').classList.remove('hidden');
+    renderTurnUI(room, 'admin-current-speaker', 'admin-timer', 'admin-turn-strip', 'admin-chat-box', false);
+    const atEnd = room.currentTurnIndex >= room.turnOrder.length;
+    document.getElementById('admin-to-vote-btn').disabled = !atEnd;
+  }
+  else if(room.status === 'voting'){
+    document.getElementById('admin-voting-panel').classList.remove('hidden');
+    document.getElementById('admin-liarcount-label').textContent = room.settings.liarCount;
+    const votes = room.votes || {};
+    document.getElementById('admin-vote-status').innerHTML = pIds.map(id=>{
+      const p = players[id];
+      const voted = votes[id] && votes[id].picks && votes[id].picks.length>0;
+      return `<li><span class="pname"><span class="avatar">${initials(p.name)}</span>${p.name}</span><span class="score-badge" style="color:${voted?'var(--teal)':'var(--muted)'}">${voted?'✅ 완료':'대기중'}</span></li>`;
+    }).join('');
+  }
+  else if(room.status === 'results'){
+    document.getElementById('admin-results-panel').classList.remove('hidden');
+    document.getElementById('admin-results-list').innerHTML = renderResultsList(room, players, pIds);
+  }
+}
+
+function renderResultsList(room, players, pIds){
+  const liarIds = Object.keys(room.liars||{});
+  return pIds.map(id=>{
+    const p = players[id];
+    const isLiar = liarIds.includes(id);
+    const delta = p.lastDelta ?? 0;
+    const deltaClass = delta>0?'pos':(delta<0?'neg':'zero');
+    const deltaText = delta>0? `+${delta}` : `${delta}`;
+    let tag = '';
+    if(isLiar){
+      tag = `<span class="tag liar-tag">🕵️ 라이어 ${p.wasCaught?'(걸림)':'(안 걸림)'}</span>`;
+    }
+    return `<div class="result-row ${isLiar?'liar':''}">
+      <span class="pname"><span class="avatar">${initials(p.name)}</span>${p.name}${tag}</span>
+      <span class="delta ${deltaClass}">${deltaText} (총 ${p.score||0}점)</span>
+    </div>`;
+  }).join('');
+}
+
+function renderTurnUI(room, speakerElId, timerElId, stripElId, chatElId, isPlayerView){
+  const order = room.turnOrder || [];
+  const idx = room.currentTurnIndex;
+  const players = room.players || {};
+  const atEnd = idx >= order.length;
+  const currentId = atEnd ? null : order[idx];
+
+  document.getElementById(speakerElId).textContent = atEnd ? '모두 발언을 마쳤어요!' : (players[currentId]? players[currentId].name : '-');
+
+  const stripEl = document.getElementById(stripElId);
+  if(stripEl){
+    stripEl.innerHTML = order.map((id,i)=>{
+      const cls = i===idx ? 'current' : (i<idx?'done':'');
+      return `<div class="turn-chip ${cls}">${players[id]?players[id].name:'?'}</div>`;
+    }).join('');
+  }
+
+  const chatEl = document.getElementById(chatElId);
+  const chat = room.chat || {};
+  const msgs = Object.values(chat).sort((a,b)=>a.ts-b.ts);
+  chatEl.innerHTML = msgs.map(m=>{
+    const mine = isPlayerView && m.playerId === myPlayerId;
+    return `<div class="chat-msg ${mine?'me':''}"><div class="who">${m.name}</div>${escapeHtml(m.text)}</div>`;
+  }).join('') || `<div class="center-note">아직 대화가 없어요</div>`;
+  chatEl.scrollTop = chatEl.scrollHeight;
+
+  return { timerElId, currentId, atEnd };
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div'); d.textContent = str; return d.innerHTML;
+}
+
+/* =========================================================
+   RENDER: PLAYER
+   ========================================================= */
+function renderPlayer(room){
+  const players = room.players || {};
+  const me = players[myPlayerId];
+  if(!me){ return; }
+
+  ['player-waiting-panel','player-topic-panel','player-reveal-panel','player-playing-panel','player-voting-panel','player-results-panel']
+    .forEach(id=>document.getElementById(id).classList.add('hidden'));
+
+  if(room.status === 'lobby'){
+    document.getElementById('player-waiting-panel').classList.remove('hidden');
+    document.getElementById('player-waiting-list').innerHTML = Object.values(players).map(p=>{
+      return `<li><span class="pname"><span class="avatar">${initials(p.name)}</span>${p.name}</span></li>`;
+    }).join('');
+  }
+  else if(room.status === 'topic'){
+    document.getElementById('player-topic-panel').classList.remove('hidden');
+    document.getElementById('player-topic-em').innerHTML = getCategoryIcon(room.currentCategory);
+    document.getElementById('player-topic-name').textContent = room.currentCategory;
+  }
+  else if(room.status === 'assigned'){
+    document.getElementById('player-reveal-panel').classList.remove('hidden');
+    const isLiar = room.liars && room.liars[myPlayerId];
+    const back = document.getElementById('player-flip-back');
+    const card = document.getElementById('player-flip-card');
+    card.classList.remove('flipped');
+    if(isLiar){
+      back.classList.add('liar');
+      document.getElementById('player-word-em').innerHTML = ICON_SVG['liar-detective'];
+      document.getElementById('player-word-text').textContent = '당신은 라이어!';
+      document.getElementById('player-word-cat').textContent = `주제: ${room.currentCategory} (제시어는 몰라요! 눈치껏 설명하세요)`;
+    } else {
+      back.classList.remove('liar');
+      document.getElementById('player-word-em').innerHTML = getWordIcon(room.normalWord.w);
+      document.getElementById('player-word-text').textContent = room.normalWord.w;
+      document.getElementById('player-word-cat').textContent = `주제: ${room.currentCategory}`;
+    }
+  }
+  else if(room.status === 'playing'){
+    document.getElementById('player-playing-panel').classList.remove('hidden');
+    const order = room.turnOrder || [];
+    const idx = room.currentTurnIndex;
+    const atEnd = idx >= order.length;
+    const currentId = atEnd ? null : order[idx];
+    const myTurn = currentId === myPlayerId;
+
+    renderTurnUI(room, 'player-current-speaker', 'player-timer', null, 'player-chat-box', true);
+    document.getElementById('player-turn-label').textContent = myTurn ? '지금 당신 차례예요!' : '지금 말할 사람';
+
+    const input = document.getElementById('player-chat-input');
+    const sendBtn = document.getElementById('player-chat-send');
+    input.disabled = !myTurn;
+    sendBtn.disabled = !myTurn;
+    input.placeholder = myTurn ? '내 제시어에 대해 설명해보세요!' : (atEnd ? '모든 발언이 끝났어요' : '차례를 기다려주세요');
+  }
+  else if(room.status === 'voting'){
+    document.getElementById('player-voting-panel').classList.remove('hidden');
+    document.getElementById('player-liarcount-label').textContent = room.settings.liarCount;
+    const already = room.votes && room.votes[myPlayerId];
+    if(already) selectedVotes = already.picks || [];
+    const grid = document.getElementById('player-vote-grid');
+    grid.innerHTML = Object.entries(players).filter(([id])=>id!==myPlayerId).map(([id,p])=>{
+      const sel = selectedVotes.includes(id);
+      return `<div class="vote-card ${sel?'selected':''}" onclick="toggleVote('${id}')">
+        <div class="av">${initials(p.name)}</div>
+        <div class="nm">${p.name}</div>
+      </div>`;
+    }).join('');
+    const submitted = !!already;
+    document.getElementById('player-vote-submit').disabled = submitted || selectedVotes.length !== room.settings.liarCount;
+    document.getElementById('player-vote-hint').textContent = submitted ? '✅ 투표를 제출했어요. 다른 친구들을 기다려주세요' : `${selectedVotes.length} / ${room.settings.liarCount} 명 선택됨`;
+  }
+  else if(room.status === 'results'){
+    document.getElementById('player-results-panel').classList.remove('hidden');
+    const pIds = Object.keys(players);
+    document.getElementById('player-results-list').innerHTML = renderResultsList(room, players, pIds);
+  }
+}
+
+function toggleVote(id){
+  const room = cachedRoomData;
+  const max = room.settings.liarCount;
+  const i = selectedVotes.indexOf(id);
+  if(i>=0){ selectedVotes.splice(i,1); }
+  else{
+    if(selectedVotes.length >= max) selectedVotes.shift();
+    selectedVotes.push(id);
+  }
+  renderPlayer(cachedRoomData);
+}
+
+function submitVote(){
+  db.ref(`rooms/${myRoomCode}/votes/${myPlayerId}`).set({ picks: selectedVotes, ts: Date.now() });
+}
+
+function flipCard(){
+  document.getElementById('player-flip-card').classList.add('flipped');
+}
+
+function sendChat(){
+  const input = document.getElementById('player-chat-input');
+  const text = input.value.trim();
+  if(!text) return;
+  const room = cachedRoomData;
+  const order = room.turnOrder || [];
+  const idx = room.currentTurnIndex;
+  db.ref(`rooms/${myRoomCode}/chat`).push({
+    playerId: myPlayerId,
+    name: room.players[myPlayerId].name,
+    text,
+    turn: idx,
+    ts: Date.now()
+  });
+  input.value = '';
+}
+document.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && document.activeElement && document.activeElement.id==='player-chat-input'){ sendChat(); }
+});
+
+/* =========================================================
+   RENDER: BOARD (전자칠판)
+   ========================================================= */
+function renderBoard(room){
+  const statusView = document.getElementById('board-status-view');
+  const mainView = document.getElementById('board-main-view');
+
+  if(room.status === 'lobby'){
+    statusView.classList.remove('hidden'); mainView.classList.add('hidden');
+    const count = room.players ? Object.keys(room.players).length : 0;
+    statusView.innerHTML = `👋 참가자를 기다리는 중이에요<br><span style="font-size:16px;">현재 ${count} / ${room.settings.maxPlayers}명 참여</span>`;
+    return;
+  }
+  statusView.classList.add('hidden'); mainView.classList.remove('hidden');
+
+  document.getElementById('board-topic-em').innerHTML = getCategoryIcon(room.currentCategory);
+  document.getElementById('board-topic-name').textContent = room.currentCategory || '주제 대기중';
+
+  const timerEl = document.getElementById('board-timer');
+  const speakerEl = document.getElementById('board-speaker');
+  const orderEl = document.getElementById('board-order');
+  const chatEl = document.getElementById('board-chat');
+  const players = room.players || {};
+  const order = room.turnOrder || [];
+
+  if(room.status === 'playing'){
+    timerEl.classList.remove('hidden'); speakerEl.classList.remove('hidden');
+    const idx = room.currentTurnIndex;
+    const atEnd = idx >= order.length;
+    speakerEl.textContent = atEnd ? '🎉 모두 발언을 마쳤어요!' : `🎤 지금은 ${players[order[idx]]?.name || '?'} 차례예요`;
+    orderEl.innerHTML = order.map((id,i)=>{
+      const cls = i===idx ? 'current' : (i<idx?'done':'');
+      return `<div class="turn-chip ${cls}">${players[id]?players[id].name:'?'}</div>`;
+    }).join('');
+    const chat = room.chat || {};
+    const msgs = Object.values(chat).sort((a,b)=>a.ts-b.ts).slice(-8);
+    chatEl.innerHTML = msgs.map(m=>`<div class="chat-msg"><div class="who">${m.name}</div>${escapeHtml(m.text)}</div>`).join('') || `<div class="board-status" style="margin:0;">아직 대화가 없어요</div>`;
+    chatEl.scrollTop = chatEl.scrollHeight;
+  } else {
+    timerEl.classList.add('hidden');
+    if(room.status === 'voting'){
+      speakerEl.classList.remove('hidden');
+      speakerEl.textContent = '🗳️ 라이어를 지목하는 중이에요...';
+      orderEl.innerHTML = '';
+      chatEl.innerHTML = `<div class="board-status" style="margin:0;">학생들이 태블릿/휴대폰으로 투표하고 있어요</div>`;
+    } else if(room.status === 'results'){
+      speakerEl.classList.remove('hidden');
+      speakerEl.textContent = '📢 결과 발표!';
+      orderEl.innerHTML = '';
+      const liarIds = Object.keys(room.liars||{});
+      const pIds = Object.keys(players);
+      chatEl.innerHTML = pIds.map(id=>{
+        const p = players[id];
+        const isLiar = liarIds.includes(id);
+        const delta = p.lastDelta ?? 0;
+        const deltaText = (delta>0?'+':'')+delta;
+        return `<div class="chat-msg" style="align-self:stretch; display:flex; justify-content:space-between; ${isLiar?'background:rgba(255,62,127,.25);':''}">
+          <span>${isLiar?'🕵️ ':''}${p.name}</span><span style="font-weight:800;">${deltaText} (${p.score||0}점)</span>
+        </div>`;
+      }).join('');
+    } else {
+      speakerEl.classList.add('hidden');
+      orderEl.innerHTML = '';
+      chatEl.innerHTML = `<div class="board-status" style="margin:0;">역할이 배정되는 중이에요...</div>`;
+    }
+  }
+}
+
+/* =========================================================
+   타이머 루프 (모든 화면 공통, 1초마다 표시 갱신)
+   ========================================================= */
+function stopTimerLoop(){ if(timerInterval){ clearInterval(timerInterval); timerInterval=null; } }
+function startTimerLoop(){
+  stopTimerLoop();
+  timerInterval = setInterval(()=>{
+    if(!cachedRoomData || cachedRoomData.status !== 'playing') return;
+    const order = cachedRoomData.turnOrder || [];
+    const atEnd = cachedRoomData.currentTurnIndex >= order.length;
+    if(atEnd || !cachedRoomData.turnEndAt) return;
+    const remain = Math.max(0, Math.round((cachedRoomData.turnEndAt - Date.now())/1000));
+    ['admin-timer','player-timer','board-timer'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el){
+        el.textContent = remain + '초';
+        el.classList.toggle('urgent', remain <= 10 && remain > 0);
+      }
+    });
+    if(remain <= 3 && remain > 0) sfxTick();
+    if(remain <= 0 && myIsAdmin){
+      nextTurn();
+    }
+  }, 1000);
+}
+startTimerLoop();
+</script>
+</body>
+</html>
