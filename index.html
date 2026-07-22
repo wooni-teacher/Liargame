@@ -505,6 +505,15 @@ input:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(139,127,232,.
       <button class="btn btn-teal" onclick="startPlaying()">▶️ 게임 시작 (순서대로 말하기)</button>
     </div>
 
+    <!-- 관리자 전용: 정답/라이어 제시어 안내 (진행 중 계속 표시) -->
+    <div class="panel hidden" id="admin-word-info-panel">
+      <h2 style="font-size:16px;">🔑 선생님만 보이는 정답 제시어</h2>
+      <div class="badge-row">
+        <span class="badge" id="admin-normal-word-badge">정답: -</span>
+        <span class="badge" id="admin-liar-word-badge" style="color:var(--pink);">라이어 제시어: -</span>
+      </div>
+    </div>
+
     <!-- Playing -->
     <div class="panel hidden" id="admin-playing-panel">
       <h2>🎤 발언 진행중</h2>
@@ -747,10 +756,6 @@ const CATEGORIES = {
   "계절과날씨": [
     {w:"봄",e:"🌸"},{w:"여름",e:"☀️"},{w:"가을",e:"🍂"},{w:"겨울",e:"⛄"},
     {w:"비",e:"🌧️"},{w:"눈",e:"❄️"},{w:"무지개",e:"🌈"},{w:"태풍",e:"🌪️"}
-  ],
-  "색깔": [
-    {w:"빨강",e:"🔴"},{w:"노랑",e:"🟡"},{w:"파랑",e:"🔵"},{w:"초록",e:"🟢"},
-    {w:"보라",e:"🟣"},{w:"주황",e:"🟠"},{w:"검정",e:"⚫"},{w:"하양",e:"⚪"}
   ]
 };
 const CATEGORY_ICON = {
@@ -1023,12 +1028,20 @@ function assignRoles(){
   const words = CATEGORIES[room.currentCategory];
   const wordObj = words[Math.floor(Math.random()*words.length)];
 
+  // 라이어에게는 같은 카테고리의 다른(비슷한) 제시어를 줍니다
+  let liarWordObj = wordObj;
+  if(words.length > 1){
+    const others = words.filter(w=>w.w !== wordObj.w);
+    liarWordObj = others[Math.floor(Math.random()*others.length)];
+  }
+
   const turnOrder = [...playerIds].sort(()=>Math.random()-0.5);
 
   db.ref('rooms/'+myRoomCode).update({
     status: 'assigned',
     liars,
     normalWord: wordObj,
+    liarWord: liarWordObj,
     turnOrder,
     currentTurnIndex: -1
   });
@@ -1089,9 +1102,12 @@ function revealResults(){
   playerIds.forEach(id=>{
     if(liarIds.includes(id)) return;
     const myPicks = (votes[id] && votes[id].picks) || [];
-    let correct = 0;
-    myPicks.forEach(p=>{ if(liarIds.includes(p)) correct++; });
-    scoreDeltas[id] = correct;
+    let total = 0;
+    liarIds.forEach(lid=>{
+      if(!caughtSet.has(lid)) return; // 못 잡은 라이어는 아무도 점수를 받지 않음
+      total += myPicks.includes(lid) ? 2 : 1;
+    });
+    scoreDeltas[id] = total;
   });
 
   const updates = {};
@@ -1122,11 +1138,18 @@ function renderAdmin(room){
   document.getElementById('admin-settings-summary').textContent =
     `최대 ${room.settings.maxPlayers}명 · ${room.settings.turnTime}초 · 라이어 ${room.settings.liarCount}명`;
 
-  ['admin-lobby-panel','admin-topic-panel','admin-assigned-panel','admin-playing-panel','admin-voting-panel','admin-results-panel']
+  ['admin-lobby-panel','admin-topic-panel','admin-assigned-panel','admin-playing-panel','admin-voting-panel','admin-results-panel','admin-word-info-panel']
     .forEach(id=>document.getElementById(id).classList.add('hidden'));
 
   const players = room.players || {};
   const pIds = Object.keys(players);
+
+  // 선생님 전용 정답/라이어 제시어 안내 (배정~투표 단계까지 계속 표시)
+  if(['assigned','playing','voting'].includes(room.status) && room.normalWord){
+    document.getElementById('admin-word-info-panel').classList.remove('hidden');
+    document.getElementById('admin-normal-word-badge').textContent = `정답: ${room.normalWord.w}`;
+    document.getElementById('admin-liar-word-badge').textContent = `라이어 제시어: ${room.liarWord ? room.liarWord.w : room.normalWord.w}`;
+  }
 
   // score list (always visible)
   document.getElementById('admin-score-count').textContent = pIds.length;
@@ -1259,17 +1282,11 @@ function renderPlayer(room){
     const back = document.getElementById('player-flip-back');
     const card = document.getElementById('player-flip-card');
     card.classList.remove('flipped');
-    if(isLiar){
-      back.classList.add('liar');
-      document.getElementById('player-word-em').innerHTML = ICON_SVG['liar-detective'];
-      document.getElementById('player-word-text').textContent = '당신은 라이어!';
-      document.getElementById('player-word-cat').textContent = `주제: ${room.currentCategory} (제시어는 몰라요! 눈치껏 설명하세요)`;
-    } else {
-      back.classList.remove('liar');
-      document.getElementById('player-word-em').innerHTML = getWordIcon(room.normalWord.w);
-      document.getElementById('player-word-text').textContent = room.normalWord.w;
-      document.getElementById('player-word-cat').textContent = `주제: ${room.currentCategory}`;
-    }
+    back.classList.remove('liar');
+    const myWord = isLiar ? (room.liarWord || room.normalWord) : room.normalWord;
+    document.getElementById('player-word-em').innerHTML = getWordIcon(myWord.w);
+    document.getElementById('player-word-text').textContent = myWord.w;
+    document.getElementById('player-word-cat').textContent = `주제: ${room.currentCategory}`;
   }
   else if(room.status === 'playing'){
     document.getElementById('player-playing-panel').classList.remove('hidden');
